@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nexo - Painel do Gerente</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Nexpro">
+<link rel="apple-touch-icon" href="/icon-192.png">
+</head>
+<body class="min-h-screen bg-slate-100">
+  <div class="max-w-7xl mx-auto p-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-black text-slate-900 uppercase tracking-tight">Painel do Gerente</h1>
+        <p id="mgr-subtitle" class="text-sm text-slate-500">Carregando...</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-refresh" class="px-4 py-2 rounded-xl border bg-white font-black text-xs uppercase">Atualizar</button>
+        <button id="btn-logout" class="px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-xs uppercase">Sair</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+      <div class="flex gap-2 p-3 border-b bg-slate-50">
+        <button class="tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-900 text-white" data-tab="reservas">Reservas do dia</button>
+        <button class="tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase border bg-white" data-tab="atribuir">Atribuir pedidos</button>
+        <button class="tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase border bg-white" data-tab="pedidos">Pedidos</button>
+      </div>
+
+      <div id="view" class="p-6"></div>
+    </div>
+  </div>
+
+  <!-- Modal código -->
+  <div id="codeModal" class="fixed inset-0 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+      <h3 id="codeTitle" class="text-lg font-black uppercase text-slate-900 mb-2">Código</h3>
+      <div class="p-4 rounded-2xl bg-slate-900 text-white text-center text-4xl font-black tracking-widest" id="codeValue">------</div>
+      <div id="codeQr" class="mt-4 flex justify-center"></div>
+      <p class="text-xs text-slate-500 mt-3">Expira em: <span id="codeExpires" class="font-black"></span></p>
+      <button id="closeCodeModal" class="mt-5 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs py-3 rounded-xl">Fechar</button>
+    </div>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const SUPABASE_URL = 'https://peluzcmwjbqodtjjxddy.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_TUX4DzHCvQkMJHNaoTfCTQ_GIHApIAC';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const view = document.getElementById('view');
+  const subtitle = document.getElementById('mgr-subtitle');
+
+  const codeModal = document.getElementById('codeModal');
+  const codeTitle = document.getElementById('codeTitle');
+  const codeValue = document.getElementById('codeValue');
+  const codeExpires = document.getElementById('codeExpires');
+  document.getElementById('closeCodeModal').onclick = () => codeModal.classList.add('hidden');
+
+  const todayISO = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  function setActiveTab(tab){
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      if (b.dataset.tab === tab) {
+        b.className = "tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-900 text-white";
+      } else {
+        b.className = "tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase border bg-white";
+      }
+    });
+  }
+
+  let session = null;
+  let me = null;
+  let access = []; // manager_store_access
+  let storeIds = [];
+  let perms = { can_assign_orders:false, can_generate_checkin_code:false, can_generate_checkout_code:false };
+
+  // filtro atual da aba Reservas
+  let currentResFilter = 'all';
+
+  async function boot(){
+    const out = await sb.auth.getSession();
+    session = out.data.session;
+    if (!session) return window.location.href = 'login.html';
+    me = session.user;
+
+    // Compatibilidade: algumas bases usam manager_profiles.manager_id (mesmo UUID do auth user)
+    // e outras usam id. Tentamos primeiro manager_id e, se não existir, fazemos fallback para id.
+    let mp = null;
+    let mpErr = null;
+
+    ({ data: mp, error: mpErr } = await sb
+      .from('manager_profiles')
+      .select('manager_id,is_active')
+      .eq('manager_id', me.id)
+      .single());
+
+    if (mpErr || !mp) {
+      ({ data: mp, error: mpErr } = await sb
+        .from('manager_profiles')
+        .select('id,is_active')
+        .eq('id', me.id)
+        .single());
+    }
+
+    if (mpErr || !mp || mp.is_active === false) {
+      alert('Seu acesso de gerente está inativo ou não existe.');
+      return window.location.href = 'login.html';
+    }
+
+    const { data: acc, error: accErr } = await sb
+      .from('manager_store_access')
+      .select('store_id, can_assign_orders, can_generate_checkin_code, can_generate_checkout_code, stores:store_id(name)')
+      .eq('manager_id', me.id);
+
+    if (accErr) {
+      console.error(accErr);
+      alert('Erro ao carregar acessos: ' + accErr.message);
+      return;
+    }
+    access = acc || [];
+    storeIds = access.map(a => a.store_id);
+    // Permissões: OR entre lojas (se qualquer loja liberar, habilita o botão)
+    perms.can_assign_orders = access.some(a => a.can_assign_orders);
+    perms.can_generate_checkin_code = access.some(a => a.can_generate_checkin_code);
+    perms.can_generate_checkout_code = access.some(a => a.can_generate_checkout_code);
+
+    const lojasTxt = access.map(a => a.stores?.name).filter(Boolean).join(', ');
+    subtitle.textContent = `Logado: ${me.email} • Lojas: ${lojasTxt || 'N/A'}`;
+
+    await renderReservas();
+  }
+
+  async function fetchReservasDoDia(){
+    const dia = todayISO();
+    if (!storeIds.length) return [];
+
+    // 1) Slots do dia (apenas lojas do gerente)
+    const { data: slots, error: slotErr } = await sb
+      .from('slots')
+      .select('id, store_id, shift_id, date')
+      .eq('date', dia)
+      .in('store_id', storeIds);
+
+    if (slotErr) { console.error(slotErr); throw slotErr; }
+    const slotList = slots || [];
+    if (!slotList.length) return [];
+
+    const slotById = new Map(slotList.map(s => [s.id, s]));
+    const slotIds = slotList.map(s => s.id);
+
+    // 2) Shifts (para obter start_time/end_time)
+    const shiftIds = [...new Set(slotList.map(s => s.shift_id).filter(Boolean))];
+    let shiftById = new Map();
+    if (shiftIds.length){
+      const { data: shifts, error: shErr } = await sb
+        .from('shifts')
+        .select('id, name, start_time, end_time')
+        .in('id', shiftIds);
+      if (shErr) { console.error(shErr); throw shErr; }
+      shiftById = new Map((shifts||[]).map(x => [x.id, x]));
+    }
+
+    // 3) Stores
+    const storeIdsUniq = [...new Set(slotList.map(s => s.store_id).filter(Boolean))];
+    let storeById = new Map();
+    if (storeIdsUniq.length){
+      const { data: stores, error: stErr } = await sb
+        .from('stores')
+        .select('id, name')
+        .in('id', storeIdsUniq);
+      if (stErr) { console.error(stErr); throw stErr; }
+      storeById = new Map((stores||[]).map(x => [x.id, x]));
+    }
+
+    // 4) Reservations do dia
+    // Preferência: slot_id (modelo novo). Fallback: vacancy_id (modelo antigo).
+    let reservations = [];
+    {
+      let { data, error } = await sb
+        .from('reservations')
+        .select('id, profile_id, slot_id, vacancy_id, status, started_at, finished_at, created_at, checking_last_at')
+        .in('slot_id', slotIds);
+
+      if (error && String(error.message||'').toLowerCase().includes('slot_id')){
+        const fb = await sb
+          .from('reservations')
+          .select('id, profile_id, slot_id, vacancy_id, status, started_at, finished_at, created_at, checking_last_at')
+          .in('vacancy_id', slotIds);
+        data = fb.data; error = fb.error;
+      }
+
+      if (error) { console.error(error); throw error; }
+      reservations = data || [];
+    }
+
+    if (!reservations.length) return [];
+
+    // 5) Profiles
+    const profileIds = [...new Set(reservations.map(r => r.profile_id).filter(Boolean))];
+    let profById = new Map();
+    if (profileIds.length){
+      const { data: profs, error: pErr } = await sb
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', profileIds);
+      if (pErr) { console.error(pErr); throw pErr; }
+      profById = new Map((profs||[]).map(p => [p.id, p]));
+    }
+
+    // Enriquecer
+    return reservations.map(r => {
+      const sid = r.slot_id || r.vacancy_id;
+      const slot = slotById.get(sid) || null;
+      const shift = slot?.shift_id ? (shiftById.get(slot.shift_id) || null) : null;
+      const store = slot?.store_id ? (storeById.get(slot.store_id) || null) : null;
+      return {
+        ...r,
+        profiles: profById.get(r.profile_id) || null,
+        slots: slot ? { ...slot, shift, store } : null,
+      };
+    });
+  }
+
+  function parseTime(dateISO, hhmm){
+    if (!dateISO || !hhmm) return null;
+    const [h,m] = String(hhmm).split(':');
+    const d = new Date(`${dateISO}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+    return d;
+  }
+
+
+  function normStatus(s){
+    const v = (s || '').toString().toLowerCase().trim();
+    if (['em_andamento','em andamento','check-in','checkin','checking','check-in ativo','check_in'].includes(v)) return 'present';
+    if (['pausa','pause','paused'].includes(v)) return 'paused';
+    if (['confirmada','confirmado','confirmed','confirm'].includes(v)) return 'to_arrive';
+    if (['check-out','checkout','checked_out','check_out','finalizado','finalizada','completed','done'].includes(v)) return 'done';
+    return v;
+  }
+
+
+  function kpis(reservas){
+    const now = Date.now();
+    const tolMin = 10;
+    let toArrive = 0, late = 0, paused = 0, present = 0;
+
+    reservas.forEach(r => {
+      const slot = r.slots;
+      const sched = parseTime(slot?.date, (slot?.shift?.start_time || slot?.start_time));
+      const schedMs = sched ? sched.getTime() : null;
+
+      const ns = normStatus(r.status);
+      if (ns === 'to_arrive') {
+        toArrive++;
+        if (schedMs && now > (schedMs + tolMin*60*1000)) late++;
+      }
+      if (ns === 'paused') paused++;
+      if (ns === 'present') present++;
+    });
+
+    return { toArrive, late, paused, present };
+  }
+
+  
+  function applyResFilter(reservas){
+    const now = Date.now();
+    const tolMin = 10;
+
+    if (currentResFilter === 'all') return reservas;
+    if (currentResFilter === 'to_arrive') return reservas.filter(r => normStatus(r.status) === 'to_arrive');
+    if (currentResFilter === 'paused') return reservas.filter(r => normStatus(r.status) === 'paused');
+    if (currentResFilter === 'present') return reservas.filter(r => normStatus(r.status) === 'present');
+    if (currentResFilter === 'late') {
+      return reservas.filter(r => {
+        if (normStatus(r.status) !== 'to_arrive') return false;
+        const slot = r.slots;
+        const sched = parseTime(slot?.date, (slot?.shift?.start_time || slot?.start_time));
+        const schedMs = sched ? sched.getTime() : null;
+        return !!(schedMs && now > (schedMs + tolMin*60*1000));
+      });
+    }
+    return reservas;
+  }
+
+function nameOf(p){
+    return p?.full_name || p?.fullname || p?.fullName || p?.email || 'Autônomo';
+  }
+
+  
+  let codeCountdownTimer = null;
+
+  function startCodeCountdown(expiresAtIso){
+    if (codeCountdownTimer) clearInterval(codeCountdownTimer);
+
+    const tick = () => {
+      const msLeft = new Date(expiresAtIso).getTime() - Date.now();
+      const secLeft = Math.max(0, Math.ceil(msLeft / 1000));
+      codeExpires.textContent = `${new Date(expiresAtIso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})} (${secLeft}s)`;
+      if (secLeft <= 0) {
+        clearInterval(codeCountdownTimer);
+        codeCountdownTimer = null;
+      }
+    };
+
+    tick();
+    codeCountdownTimer = setInterval(tick, 250);
+  }
+
+  async function upsertCode(reservationId, codeType){
+    // pega a reserva (para validar permissão e status)
+    const reservas = await fetchReservasDoDia();
+    const res = reservas.find(x => x.id === reservationId);
+    if (!res) throw new Error('Reserva não encontrada.');
+
+    if ((codeType === 'checkin' || codeType === 'resume') && !perms.can_generate_checkin_code) {
+      throw new Error('Sem permissão para gerar check-in/retomar.');
+    }
+    if (codeType === 'checkout' && !perms.can_generate_checkout_code) {
+      throw new Error('Sem permissão para gerar check-out.');
+    }
+
+    // regra: retomar só faz sentido quando está em pausa
+    if (codeType === 'resume' && normStatus(res.status) !== 'paused') {
+      throw new Error('Retomar só está disponível quando a reserva está em PAUSA.');
+    }
+
+    // 60 segundos
+    const nowMs = Date.now();
+    const ttlMs = 60 * 1000;
+
+    // tenta reutilizar código ainda válido (evita erro de unique)
+    const { data: existing, error: selErr } = await sb
+      .from('reservation_codes')
+      .select('id, code, expires_at')
+      .eq('reservation_id', reservationId)
+      .eq('code_type', codeType)
+      .maybeSingle();
+
+    if (selErr) throw selErr;
+
+    let code = null;
+    let expiresAt = null;
+
+    const existingExpMs = existing?.expires_at ? new Date(existing.expires_at).getTime() : 0;
+    if (existing && existingExpMs > nowMs) {
+      code = existing.code;
+      expiresAt = existing.expires_at;
+    } else {
+      code = String(Math.floor(100000 + Math.random()*900000)); // 6 dígitos
+      expiresAt = new Date(nowMs + ttlMs).toISOString();
+
+      if (existing?.id) {
+        // atualiza o registro existente (resolve o unique constraint)
+        const { error: updErr } = await sb
+          .from('reservation_codes')
+          .update({ code, expires_at: expiresAt, created_by: me.id })
+          .eq('id', existing.id);
+
+        if (updErr) throw updErr;
+      } else {
+        // cria novo registro
+        const { error: insErr } = await sb
+          .from('reservation_codes')
+          .insert({
+            reservation_id: reservationId,
+            code_type: codeType,
+            code,
+            expires_at: expiresAt,
+            created_by: me.id
+          });
+
+        if (insErr) {
+          // corrida: se já existir por constraint, faz update por lookup
+          const { data: ex2, error: ex2Err } = await sb
+            .from('reservation_codes')
+            .select('id')
+            .eq('reservation_id', reservationId)
+            .eq('code_type', codeType)
+            .maybeSingle();
+
+          if (ex2Err) throw insErr;
+
+          if (ex2?.id) {
+            const { error: upd2Err } = await sb
+              .from('reservation_codes')
+              .update({ code, expires_at: expiresAt, created_by: me.id })
+              .eq('id', ex2.id);
+
+            if (upd2Err) throw upd2Err;
+          } else {
+            throw insErr;
+          }
+        }
+      }
+    }
+
+    codeTitle.textContent =
+      (codeType === 'checkin') ? 'Código de CHECK-IN' :
+      (codeType === 'checkout') ? 'Código de CHECK-OUT' :
+      'Código de RETOMAR PAUSA';
+
+    const codeQr = document.getElementById('codeQr');
+    if (codeQr) {
+      codeQr.innerHTML = '';
+      try {
+        new QRCode(codeQr, { text: String(code), width: 220, height: 220 });
+      } catch (e) {}
+    }
+
+    codeValue.textContent = code;
+    startCodeCountdown(expiresAt);
+
+    codeModal.classList.remove('hidden');
+    codeModal.classList.add('flex');
+  }
+
+  async function renderReservas(){
+    setActiveTab('reservas');
+
+    view.innerHTML = `<div class="text-center text-slate-500 italic p-10">Carregando reservas do dia...</div>`;
+    let reservas = [];
+    try {
+      reservas = await fetchReservasDoDia();
+    } catch(e){
+      return view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${e.message}</div>`;
+    }
+
+    const { toArrive, late, paused, present } = kpis(reservas);
+
+    const cards = `
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-xs text-slate-500 font-bold">Filtros rápidos</div>
+        <button type="button" class="kpi-all px-3 py-1.5 rounded-xl border bg-white text-xs font-black ${currentResFilter==='all'?'ring-2 ring-slate-900':''}" data-filter="all">Todas</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left hover:shadow-sm ${currentResFilter==='to_arrive'?'ring-2 ring-slate-900':''}" data-filter="to_arrive">
+          <div class="text-[10px] uppercase font-black text-slate-400">Para chegar</div>
+          <div class="text-3xl font-black text-slate-900">${toArrive}</div>
+        </button>
+
+        <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left hover:shadow-sm ${currentResFilter==='late'?'ring-2 ring-slate-900':''}" data-filter="late">
+          <div class="text-[10px] uppercase font-black text-slate-400">Check-in em atraso</div>
+          <div class="text-3xl font-black text-red-600">${late}</div>
+        </button>
+
+        <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left hover:shadow-sm ${currentResFilter==='paused'?'ring-2 ring-slate-900':''}" data-filter="paused">
+          <div class="text-[10px] uppercase font-black text-slate-400">Pausados</div>
+          <div class="text-3xl font-black text-amber-700">${paused}</div>
+        </button>
+
+        <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left hover:shadow-sm ${currentResFilter==='present'?'ring-2 ring-slate-900':''}" data-filter="present">
+          <div class="text-[10px] uppercase font-black text-slate-400">Presentes</div>
+          <div class="text-3xl font-black text-emerald-700">${present}</div>
+        </button>
+      </div>
+    `;
+
+    const filtered = applyResFilter(reservas);
+
+    const rows = filtered.map(r => {
+      const slot = r.slots || {};
+      const loja = (slot.store?.name || slot.stores?.name || 'Loja');
+      const stt = (slot.shift?.start_time || slot.start_time || '??:??');
+      const ett = (slot.shift?.end_time || slot.end_time || '??:??');
+      const hora = `${stt} - ${ett}`;
+      const nm = nameOf(r.profiles);
+      const st = r.status || '-';
+
+      const canCI = perms.can_generate_checkin_code;
+      const canCO = perms.can_generate_checkout_code;
+
+      return `
+        <div class="p-4 border rounded-2xl mb-3 bg-white">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-3">
+                <div class="text-2xl font-black text-slate-900">${hora}</div>
+                <div class="text-sm font-black text-slate-900">${nm}</div>
+                <span class="text-[10px] font-black uppercase px-2 py-1 rounded-full border">${st}</span>
+              </div>
+              <div class="text-xs text-slate-500 mt-1">${loja}</div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase ${canCI?'bg-emerald-600 text-white':'bg-slate-200 text-slate-400 cursor-not-allowed'}" data-id="${r.id}" data-type="checkin" ${canCI?'':'disabled'}>Gerar Check-in</button>
+              <button class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase ${canCO?'bg-slate-900 text-white':'bg-slate-200 text-slate-400 cursor-not-allowed'}" data-id="${r.id}" data-type="checkout" ${canCO?'':'disabled'}>Gerar Check-out</button>
+              <button class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase bg-amber-600 text-white" data-id="${r.id}" data-type="resume" ${normStatus(r.status)==='paused'?'':'disabled'} title="Disponível apenas quando a reserva está em pausa">Gerar Retomar</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    view.innerHTML = cards + `<div>${rows || '<div class="text-slate-500 italic p-8">Nenhuma reserva hoje.</div>'}</div>`;
+    // eventos de filtro
+    document.querySelectorAll('.kpi-card').forEach(el => {
+      el.onclick = () => {
+        currentResFilter = el.dataset.filter;
+        renderReservas();
+      };
+    });
+    document.querySelectorAll('.kpi-all').forEach(el => {
+      el.onclick = () => {
+        currentResFilter = 'all';
+        renderReservas();
+      };
+    });
+
+
+
+    document.querySelectorAll('.btn-code').forEach(b => {
+      b.onclick = async () => {
+        try {
+          await upsertCode(b.dataset.id, b.dataset.type);
+        } catch(e){
+          alert(e.message || e);
+        }
+      }
+    });
+  }
+
+  async function renderAtribuir(){
+    setActiveTab('atribuir');
+
+    if (!perms.can_assign_orders) {
+      view.innerHTML = `<div class="p-6 rounded-2xl border bg-white text-slate-700">
+        <div class="font-black uppercase mb-2">Sem permissão</div>
+        <p class="text-sm">Você não tem permissão para atribuir pedidos.</p>
+      </div>`;
+      return;
+    }
+
+    view.innerHTML = `<div class="text-center text-slate-500 italic p-10">Carregando...</div>`;
+    let reservas = [];
+    try {
+      reservas = await fetchReservasDoDia();
+    } catch(e){
+      return view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${e.message}</div>`;
+    }
+
+    const presentes = reservas.filter(r => normStatus(r.status) === 'present');
+    const pausados = reservas.filter(r => normStatus(r.status) === 'paused');
+
+        
+    // ===== PAUSA TOTAL (CORRIGIDO) =====
+    // Regra: (pause→resume) + (pause→resume) + ... + (pause→agora) quando houver pausa aberta.
+    // Importante: NÃO some incrementalmente em cima de um valor salvo, sempre recalcule do zero pelos eventos.
+    const pauseTotalSecondsByResId = new Map();
+    const pauseClosedMsByResId = new Map();      // soma apenas pausas já encerradas
+    const openPauseStartMsByResId = new Map();   // pause aberto (sem resume)
+
+    async function fetchPauseEvents(resIds){
+      // Preferência 1: reservation_events (event_type = pause/resume) — é o “evento real”, não o código gerado
+      try{
+        const { data, error } = await sb
+          .from('reservation_events')
+          .select('reservation_id, event_type, created_at')
+          .in('reservation_id', resIds)
+          .in('event_type', ['pause','resume'])
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map(x => ({
+          reservation_id: x.reservation_id,
+          type: x.event_type,
+          created_at: x.created_at
+        }));
+      }catch(e1){
+        // Preferência 2: reservation_logs (event_type = pause/resume)
+        try{
+          const { data, error } = await sb
+            .from('reservation_logs')
+            .select('reservation_id, event_type, created_at')
+            .in('reservation_id', resIds)
+            .in('event_type', ['pause','resume'])
+            .order('created_at', { ascending: true });
+
+          if (error) throw error;
+
+          return (data || []).map(x => ({
+            reservation_id: x.reservation_id,
+            type: x.event_type,
+            created_at: x.created_at
+          }));
+        }catch(e2){
+          // Fallback final: reservation_codes (code_type = pause/resume)
+          const { data, error } = await sb
+            .from('reservation_codes')
+            .select('reservation_id, code_type, created_at')
+            .in('reservation_id', resIds)
+            .in('code_type', ['pause','resume'])
+            .order('created_at', { ascending: true });
+
+          if (error) {
+            console.error('Erro ao buscar eventos de pausa (reservation_events / reservation_logs / reservation_codes):', error);
+            return [];
+          }
+
+          return (data || []).map(x => ({
+            reservation_id: x.reservation_id,
+            type: x.code_type,
+            created_at: x.created_at
+          }));
+        }
+      }
+    }
+
+    function calcPauseFromEvents(events, nowMs){
+      let closedMs = 0;
+      let openStartMs = null;
+
+      for (const ev of (events || [])) {
+        const t = new Date(ev.created_at).getTime();
+        if (Number.isNaN(t)) continue;
+
+        if (ev.type === 'pause') {
+          // Se já existe pausa aberta, IGNORA (evita duplicar/“reabrir” e bagunçar o total)
+          if (openStartMs == null) openStartMs = t;
+        } else if (ev.type === 'resume') {
+          if (openStartMs != null) {
+            if (t > openStartMs) closedMs += (t - openStartMs);
+            openStartMs = null;
+          }
+        }
+      }
+
+      const openMs = (openStartMs != null) ? Math.max(0, nowMs - openStartMs) : 0;
+      return { closedMs, openStartMs, totalMs: closedMs + openMs };
+    }
+
+    if (pausados.length){
+      const pausedResIds = pausados.map(r => r.id);
+
+      const eventsAll = await fetchPauseEvents(pausedResIds);
+
+      const byRes = new Map();
+      (eventsAll || []).forEach(ev => {
+        if (!byRes.has(ev.reservation_id)) byRes.set(ev.reservation_id, []);
+        byRes.get(ev.reservation_id).push(ev);
+      });
+
+      const nowMs = Date.now();
+      pausados.forEach(r => {
+        const events = byRes.get(r.id) || [];
+        const { closedMs, openStartMs, totalMs } = calcPauseFromEvents(events, nowMs);
+
+        pauseClosedMsByResId.set(r.id, closedMs);
+        if (openStartMs != null) openPauseStartMsByResId.set(r.id, openStartMs);
+
+        pauseTotalSecondsByResId.set(r.id, Math.max(0, Math.floor(totalMs / 1000)));
+      });
+    }
+
+const listPresentes = presentes.map(r => `
+  <label class="flex items-center gap-3 py-2">
+    <input type="checkbox" class="picker-check scale-110" value="${r.profile_id}" data-res="${r.id}">
+    <span class="font-black">${nameOf(r.profiles)}</span>
+    <span class="text-xs text-slate-500">(${r.slots?.stores?.name || 'Loja'})</span>
+  </label>
+`).join('');
+
+const listPausados = pausados.map(r => {
+  const secs = pauseTotalSecondsByResId.get(r.id);
+  const mins = (secs === 0 || secs) ? Math.floor(secs / 60) : null;
+  const txt = (mins === 0 || mins) ? `Pausa total: ${mins} min` : 'Pausa total: —';
+  return `
+    <div class="flex items-center gap-3 py-2 opacity-70">
+      <input type="checkbox" class="scale-110" disabled>
+      <div class="flex flex-col">
+        <div class="font-black">
+          ${nameOf(r.profiles)}
+          <span class="pause-total text-[11px] text-orange-600 font-black ml-2" data-res="${r.id}">${txt}</span>
+        </div>
+        <div class="text-xs text-slate-500">${r.slots?.stores?.name || 'Loja'} • Não é possível atribuir durante a pausa</div>
+      </div>
+    </div>
+  `;
+}).join('');
+
+const list = (listPresentes || '') + (listPausados ? `<div class="mt-3 pt-3 border-t"><div class="text-[10px] font-black uppercase text-slate-400 mb-2">Pausados (bloqueado)</div>${listPausados}</div>` : '');
+
+view.innerHTML = `
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="bg-white border rounded-2xl p-6 shadow-sm">
+      <h3 class="text-sm font-black uppercase text-slate-900 mb-4">Selecionar (check-in ativo)</h3>
+      <div class="max-h-80 overflow-auto border rounded-2xl p-3">${list || '<div class="text-slate-500 italic">Nenhum presente.</div>'}</div>
+    </div>
+
+    <div class="bg-white border rounded-2xl p-6 shadow-sm lg:col-span-2">
+      <h3 class="text-sm font-black uppercase text-slate-900 mb-4">Atribuir pedido</h3>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-[10px] font-black uppercase text-slate-400">Plataforma</label>
+          <input id="order-channel" class="w-full border rounded-xl p-3" placeholder="Ex: Janis, iFood, VTEX, etc" />
+          <p class="text-[11px] text-slate-500 mt-1">Digite o nome da plataforma (não é mais lista fixa).</p>
+        </div>
+        <div>
+          <label class="text-[10px] font-black uppercase text-slate-400">Código do pedido</label>
+          <input id="order-code" class="w-full border rounded-xl p-3" placeholder="Ex: A1B2C3"/>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="text-[10px] font-black uppercase text-slate-400">Mensagem (opcional)</label>
+        <textarea id="order-note" class="w-full border rounded-xl p-3" rows="3" placeholder="Observações..."></textarea>
+      </div>
+
+      <button id="btn-assign" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs py-3 rounded-xl">
+        Atribuir
+      </button>
+      <p class="text-xs text-slate-500 mt-3">Ao atribuir, o autônomo recebe um pop-up e pode aceitar ou recusar com justificativa.</p>
+    </div>
+  </div>
+`;
+
+// Atualiza em tempo real (a cada 1s) o total de pausa quando existir pausa aberta (último pause sem resume)
+if (window.__pauseTotalTicker) {
+  clearInterval(window.__pauseTotalTicker);
+  window.__pauseTotalTicker = null;
+}
+
+if (openPauseStartMsByResId.size) {
+  window.__pauseTotalTicker = setInterval(() => {
+    const nowMs = Date.now();
+    openPauseStartMsByResId.forEach((openStartMs, resId) => {
+      const closedMs = pauseClosedMsByResId.get(resId) || 0;
+      const totalMs = closedMs + Math.max(0, nowMs - openStartMs);
+      const mins = Math.floor(totalMs / 60000);
+      const el = document.querySelector(`.pause-total[data-res="${resId}"]`);
+      if (el) el.textContent = `Pausa total: ${mins} min`;
+    });
+  }, 1000);
+}
+
+document.getElementById('btn-assign').onclick = async () => {
+      try {
+        const checked = Array.from(document.querySelectorAll('.picker-check:checked'));
+        if (checked.length < 1) return alert('Selecione pelo menos 1 autônomo (check-in ativo).');
+
+        const channel = document.getElementById('order-channel').value.trim();
+        const orderCode = document.getElementById('order-code').value.trim();
+        const note = document.getElementById('order-note').value.trim();
+
+        if (!channel) return alert('Informe a plataforma.');
+        if (!orderCode) return alert('Informe o código do pedido.');
+
+        // valida loja: os 2 precisam estar na mesma loja (via reservation slot)
+        const resIds = checked.map(c => c.dataset.res);
+        const baseRes = presentes.find(r => r.id === resIds[0]);
+        const baseStore = baseRes?.slots?.store_id;
+        const sameStore = resIds.every(rid => (presentes.find(r => r.id === rid)?.slots?.store_id) === baseStore);
+        if (!sameStore) return alert('Todos os autônomos selecionados precisam estar na mesma loja para este pedido.');
+
+        // cria grupo (compatível com schema do ADM)
+        const nowIso = new Date().toISOString();
+        let groupId = null;
+
+        try{
+          const { data, error } = await sb.from('order_assignment_groups')
+            .insert({ store_id: baseStore, channel, order_code: orderCode, scheduled_at: nowIso })
+            .select('id')
+            .maybeSingle();
+          if(error) throw error;
+          groupId = data?.id;
+        }catch(e1){
+          // fallback sem scheduled_at / colunas extras
+          const { data, error } = await sb.from('order_assignment_groups')
+            .insert({ store_id: baseStore, channel, order_code: orderCode })
+            .select('id')
+            .maybeSingle();
+          if(error) throw error;
+          groupId = data?.id;
+        }
+
+        if(!groupId) throw new Error('Não consegui criar o grupo do pedido.');
+
+        // cria 2 assignments
+        const rows = checked.map(c => {
+          const rid = c.dataset.res;
+          const assignee = c.value;
+          return {
+            group_id: groupId,
+            reservation_id: rid,
+            assignee_profile_id: assignee,
+            status: 'pending_acceptance'
+          };
+        });
+
+        const { error: asErr } = await sb.from('order_assignments').insert(rows);
+        if (asErr) throw asErr;
+
+        alert('Pedido atribuído. Aguardando aceite do(s) autônomo(s).');
+        document.getElementById('order-code').value = '';
+        document.getElementById('order-note').value = '';
+        checked.forEach(c => c.checked = false);
+
+      } catch(e) {
+        console.error(e);
+        alert('Erro ao atribuir: ' + (e.message || e));
+      }
+    };
+  }
+
+  async function renderPedidos(){
+    setActiveTab('pedidos');
+
+    view.innerHTML = `<div class="text-center text-slate-500 italic p-10">Carregando pedidos...</div>`;
+
+    // lista pedidos por lojas do gerente
+    if (!storeIds.length) {
+      view.innerHTML = `<div class="p-8 text-slate-500 italic">Sem lojas atribuídas.</div>`;
+      return;
+    }
+
+    const { data, error } = await sb
+      .from('order_assignment_groups')
+      .select(`
+        id, store_id, channel, order_code, manager_note, created_at,
+        stores:store_id(name),
+        order_assignments(id, status, assignee_profile_id, items_count, completed_on_time, refusal_reason, late_reason,
+          profiles:assignee_profile_id(full_name,email)
+        )
+      `)
+      .in('store_id', storeIds)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error(error);
+      view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${error.message}</div>`;
+      return;
+    }
+
+    const groups = (data || []).map(g => {
+      const loja = g.stores?.name || 'Loja';
+      const when = new Date(g.created_at).toLocaleString('pt-BR');
+      const a = (g.order_assignments || []).map(x => {
+        const nm = nameOf(x.profiles);
+        const st = x.status;
+        let extra = '';
+        if (st === 'refused' && x.refusal_reason) extra = ` • Recusa: ${x.refusal_reason}`;
+        if (st === 'completed') extra = ` • Itens: ${x.items_count ?? '-'} • No prazo: ${x.completed_on_time ? 'Sim' : 'Não'}${x.late_reason ? ' • Motivo: '+x.late_reason : ''}`;
+        return `<div class="text-sm"><span class="font-black">${nm}</span> <span class="text-xs uppercase font-black px-2 py-1 rounded-full border ml-2">${st}</span><span class="text-xs text-slate-500">${extra}</span></div>`;
+      }).join('');
+
+      return `
+        <div class="p-5 rounded-2xl border bg-white mb-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="font-black text-slate-900">${g.channel} • ${g.order_code}</div>
+              <div class="text-xs text-slate-500">${loja} • ${when}</div>
+              ${g.manager_note ? `<div class="text-xs text-slate-600 mt-2"><span class="font-black">Obs:</span> ${g.manager_note}</div>` : ''}
+            </div>
+          </div>
+          <div class="mt-3 space-y-2">${a || '<div class="text-slate-500 italic">Sem atribuições.</div>'}</div>
+        </div>
+      `;
+    }).join('');
+
+    view.innerHTML = groups || `<div class="p-8 text-slate-500 italic">Nenhum pedido.</div>`;
+  }
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tab = btn.dataset.tab;
+      if (tab === 'reservas') return renderReservas();
+      if (tab === 'atribuir') return renderAtribuir();
+      if (tab === 'pedidos') return renderPedidos();
+    });
+  });
+
+  document.getElementById('btn-refresh').onclick = async () => {
+    const active = document.querySelector('.tab-btn.bg-slate-900')?.dataset?.tab || 'reservas';
+    if (active === 'reservas') return renderReservas();
+    if (active === 'atribuir') return renderAtribuir();
+    if (active === 'pedidos') return renderPedidos();
+  };
+
+  document.getElementById('btn-logout').onclick = async () => {
+    await sb.auth.signOut();
+    window.location.href = 'login.html';
+  };
+
+  await boot();
+});
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        await navigator.serviceWorker.register('/sw.js');
+        console.log('Service Worker registrado com sucesso');
+      } catch (err) {
+        console.error('Erro ao registrar Service Worker:', err);
+      }
+    });
+  }
+</script>
+</body>
+</html>
