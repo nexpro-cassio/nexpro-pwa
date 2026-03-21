@@ -27,13 +27,13 @@
           📲
         </div>
 
-        <h2 class="text-2xl font-bold text-gray-800 mb-2">
-          Instale o app Nexpro
-        </h2>
+        <h2 id="pwaModalTitle" class="text-2xl font-bold text-gray-800 mb-2">
+  Instale o app Nexpro
+</h2>
 
-        <p class="text-sm text-gray-600 mb-5 leading-relaxed">
-          Para usar sem barra do navegador e receber notificações, instale o app na sua tela inicial e ative as notificações.
-        </p>
+<p id="pwaModalText" class="text-sm text-gray-600 mb-5 leading-relaxed">
+
+</p>
       </div>
 
       <div class="space-y-3">
@@ -54,13 +54,16 @@
         </button>
 
         <div
-          id="iosInstallHint"
-          class="hidden text-sm text-left bg-gray-50 border border-gray-200 rounded-xl p-4 text-gray-700 leading-relaxed"
-        >
-          <strong class="block mb-2">No iPhone:</strong>
-          Abra no <strong>Safari</strong>, toque em <strong>Compartilhar</strong> e depois em
-          <strong>Adicionar à Tela de Início</strong>.
-        </div>
+  id="iosInstallHint"
+  class="hidden text-sm text-left bg-gray-50 border border-gray-200 rounded-xl p-4 text-gray-700 leading-relaxed"
+>
+  <strong class="block mb-2">No iPhone:</strong>
+  Na parte inferior da tela toque em <span class="inline-flex items-center justify-center w-5 h-5 border border-gray-400 rounded-md text-xs">↑</span>
+  <span class="inline-flex items-center gap-1 font-semibold">
+    Compartilhar
+  </span>
+  e depois em <strong>Adicionar à Tela de Início</strong>.
+</div>
 
         <button
           id="closePwaModal"
@@ -541,6 +544,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 const SUPABASE_URL = 'https://peluzcmwjbqodtjjxddy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_TUX4DzHCvQkMJHNaoTfCTQ_GIHApIAC'; 
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+}
+
 /* ===== PWA / MODAL INSTALAÇÃO E NOTIFICAÇÕES ===== */
 let deferredPrompt = null;
 
@@ -549,6 +563,8 @@ const installPwaBtn = document.getElementById('installPwaBtn');
 const enableNotificationsBtn = document.getElementById('enableNotificationsBtn');
 const closePwaModal = document.getElementById('closePwaModal');
 const iosInstallHint = document.getElementById('iosInstallHint');
+const pwaModalTitle = document.getElementById('pwaModalTitle');
+const pwaModalText = document.getElementById('pwaModalText');
 
 const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
 const isInStandalone =
@@ -557,27 +573,91 @@ const isInStandalone =
 
 function showPwaModal() {
   if (!pwaModal) return;
-  if (sessionStorage.getItem('pwaModalClosed') === '1') return;
-  if (isInStandalone) return;
+
+  const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
 
   pwaModal.classList.remove('hidden');
 
-  if (isIos) {
-    iosInstallHint.classList.remove('hidden');
+  if (isIos && isStandalone) {
+    if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+    if (pwaModalText) pwaModalText.textContent = 'Receba avisos importantes diretamente no seu iPhone.';
+
+    enableNotificationsBtn.classList.remove('hidden');
+    installPwaBtn.classList.add('hidden');
+    iosInstallHint.classList.add('hidden');
+    return;
   }
+
+  if (isIos && !isStandalone) {
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Instale o app Nexpro';
+
+  enableNotificationsBtn.classList.add('hidden'); // 👈 CORRETO
+  installPwaBtn.classList.add('hidden');
+  iosInstallHint.classList.remove('hidden');
+  return;
 }
 
-function hidePwaModal() {
-  if (!pwaModal) return;
-  pwaModal.classList.add('hidden');
-}
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Instale o app Nexpro';
+  if (pwaModalText) pwaModalText.textContent = 'Para usar sem barra do navegador e receber notificações, instale o app na sua tela inicial e ative as notificações.';
 
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
+  enableNotificationsBtn.classList.remove('hidden');
 
-  if (installPwaBtn && !isIos) {
+  if (deferredPrompt) {
     installPwaBtn.classList.remove('hidden');
+  } else {
+    installPwaBtn.classList.add('hidden');
+  }
+
+  iosInstallHint.classList.add('hidden');
+}
+
+enableNotificationsBtn?.addEventListener('click', async () => {
+  try {
+    const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true;
+
+    if (!('serviceWorker' in navigator)) {
+      alert('Seu navegador não suporta Service Worker.');
+      return;
+    }
+
+    if (!('PushManager' in window)) {
+      alert('Este dispositivo não suporta notificações push neste modo.');
+      return;
+    }
+
+    if (isIos && !isStandalone) {
+      alert('No iPhone, primeiro instale o app na Tela de Início e abra pelo ícone do app.');
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission !== 'granted') {
+      alert('Permissão de notificações não concedida.');
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array('SUA_PUBLIC_VAPID_KEY_AQUI')
+      });
+    }
+        console.log('PUSH_SUBSCRIPTION', JSON.stringify(subscription));
+    alert('Notificações ativadas com sucesso.');
+  } catch (error) {
+    console.error('Erro ao ativar notificações:', error);
+    alert('Erro ao ativar notificações.');
   }
 });
 
@@ -594,45 +674,26 @@ installPwaBtn?.addEventListener('click', async () => {
     installPwaBtn.classList.add('hidden');
   } catch (error) {
     console.error('Erro ao instalar PWA:', error);
-  }
-});
-
-enableNotificationsBtn?.addEventListener('click', async () => {
-  try {
-    if (!('Notification' in window)) {
-      alert('Este dispositivo não suporta notificações pelo navegador.');
-      return;
-    }
-
-    if (!('serviceWorker' in navigator)) {
-      alert('Seu navegador não suporta Service Worker.');
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-
-    if (permission === 'granted') {
-      alert('Notificações ativadas com sucesso.');
-    } else if (permission === 'denied') {
-      alert('Permissão de notificações foi bloqueada.');
-    } else {
-      alert('Permissão de notificações não concedida.');
-    }
-  } catch (error) {
-    console.error('Erro ao ativar notificações:', error);
-    alert('Não foi possível ativar as notificações.');
+    alert('Erro ao instalar o app.');
   }
 });
 
 closePwaModal?.addEventListener('click', () => {
-  sessionStorage.setItem('pwaModalClosed', '1');
   hidePwaModal();
 });
 
-setTimeout(() => {
-  showPwaModal();
-}, 800);
+showPwaModal();
 
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showPwaModal();
+});
+
+function hidePwaModal() {
+  if (!pwaModal) return;
+  pwaModal.classList.add('hidden');
+}
 
 // ==== MODO CORREÇÃO (reprovação) ====
 window.__correctionMode = false;
@@ -1382,20 +1443,6 @@ prev.onclick = () => {
     </div>
   </div>
 </div>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-      try {
-        await navigator.serviceWorker.register('/sw.js');
-        console.log('Service Worker registrado com sucesso');
-      } catch (err) {
-        console.error('Erro ao registrar Service Worker:', err);
-      }
-    });
-  }
-</script>
-</script>
-
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
