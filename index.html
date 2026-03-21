@@ -654,7 +654,9 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       });
     }
         console.log('PUSH_SUBSCRIPTION', JSON.stringify(subscription));
-    alert('Notificações ativadas com sucesso.');
+localStorage.setItem('pushEnabled', 'true');
+hidePwaModal();
+alert('Notificações ativadas com sucesso.');
   } catch (error) {
     console.error('Erro ao ativar notificações:', error);
     alert('Erro ao ativar notificações.');
@@ -682,7 +684,11 @@ closePwaModal?.addEventListener('click', () => {
   hidePwaModal();
 });
 
-showPwaModal();
+const pushAlreadyEnabled = localStorage.getItem('pushEnabled') === 'true';
+
+if (!pushAlreadyEnabled) {
+  showPwaModal();
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
