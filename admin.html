@@ -3890,18 +3890,6 @@ if (!error && res.data && res.data[0]?.id) {
 }
 error = res.error;
 
-if (!error && res.data && res.data[0]?.id) {
-    try {
-        await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slot_id: res.data[0].id })
-        });
-    } catch (e) {
-        console.error('Erro ao enviar push da vaga nova:', e);
-    }
-}
-
 } else {
     // UPDATE SLOT: mantém as vagas já ocupadas, só ajusta o que sobra.
     const { data: cur, error: eCur } = await _supabase
