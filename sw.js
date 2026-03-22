@@ -1,16 +1,18 @@
-const CACHE_NAME = 'nexpro-v2';
-const URLS_TO_CACHE = [
+const CACHE_NAME = 'nexpro-v3';
+const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/autonomo.html',
   '/gerente.html',
-  '/admin.html'
+  '/admin.html',
+  '/manifest.json',
+  '/icon-192.png'
 ];
 
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
   );
 });
 
@@ -32,8 +34,26 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  // HTML sempre tenta rede primeiro para não ficar preso em versão antiga
+  if (req.mode === 'navigate' || req.destination === 'document') {
+    event.respondWith(
+      fetch(req)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
+          return response;
+        })
+        .catch(() => caches.match(req).then(r => r || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // arquivos estáticos: cache first
   event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
+    caches.match(req).then(response => response || fetch(req))
   );
 });
 
@@ -42,7 +62,7 @@ self.addEventListener('push', (event) => {
 
   try {
     data = event.data ? event.data.json() : {};
-  } catch (e) {
+  } catch (_) {
     data = {};
   }
 
@@ -51,8 +71,9 @@ self.addEventListener('push', (event) => {
     body: data.body || 'Nova notificação',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
+    tag: data.tag || 'default',
     data: {
-      url: '/'
+      url: data.url || '/autonomo.html'
     }
   };
 
@@ -64,7 +85,7 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  const url = event.notification.data?.url || '/autonomo.html';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
