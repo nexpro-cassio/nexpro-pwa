@@ -3873,6 +3873,21 @@ async function saveSlot() {
     };
 
     const res = await _supabase.from('slots').insert([payload]).select();
+    error = res.error;
+
+if (!error && res.data && res.data[0]?.id) {
+    console.log("CHAMANDO notify-new-slot", res.data[0].id);
+
+    try {
+        await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot_id: res.data[0].id })
+        });
+    } catch (e) {
+        console.error('Erro ao enviar push da vaga nova:', e);
+    }
+}
 error = res.error;
 
 if (!error && res.data && res.data[0]?.id) {
@@ -4032,11 +4047,6 @@ async function loadShiftsForModal(storeId) {
 
     shiftSelect.innerHTML = opts.join('');
 }
-
-
-function closeSlotModal() { document.getElementById('modal-slot').classList.add('hidden'); }
-
-
 
 // 4. ABA RESERVAS
 async function renderBookingsTab(container) {
