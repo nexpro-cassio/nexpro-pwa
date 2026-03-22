@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function boot(){
     const out = await sb.auth.getSession();
     session = out.data.session;
-    if (!session) return window.location.href = 'login.html';
+    if (!session) return window.location.href = '/index.html';
     me = session.user;
 
     // Compatibilidade: algumas bases usam manager_profiles.manager_id (mesmo UUID do auth user)
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (mpErr || !mp || mp.is_active === false) {
       alert('Seu acesso de gerente está inativo ou não existe.');
-      return window.location.href = 'login.html';
+      return window.location.href = '/index.html';
     }
 
     const { data: acc, error: accErr } = await sb
@@ -895,7 +895,7 @@ document.getElementById('btn-assign').onclick = async () => {
 
   document.getElementById('btn-logout').onclick = async () => {
     await sb.auth.signOut();
-    window.location.href = 'login.html';
+    window.location.href = '/index.html';
   };
 
   await boot();
