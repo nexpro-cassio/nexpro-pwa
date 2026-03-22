@@ -3865,58 +3865,68 @@ async function saveSlot() {
     const isNew = !(id && id.length > 5);
 
     if (isNew) {
-        // NOVO SLOT: total e disponíveis começam iguais
-        const payload = {
-            ...payloadBase,
-            quantity: newTotal,            // legado (mantém compatibilidade)
-            total_capacity: newTotal,      // TOTAL CADASTRADO
-            available_capacity: newTotal   // DISPONÍVEIS
-        };
-        const res = await _supabase.from('slots').insert([payload]);
-        error = res.error;
-        if (!error) {
-    // Notifica apenas se for vaga nova
+    const payload = {
+        ...payloadBase,
+        quantity: newTotal,
+        total_capacity: newTotal,
+        available_capacity: newTotal
+    };
+
+    const res = await _supabase.from('slots').insert([payload]).select();
+error = res.error;
+
+if (!error && res.data && res.data[0]?.id) {
     try {
-        await notifyUsersForStore(payload.store_id, payload.date);
+        await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot_id: res.data[0].id })
+        });
     } catch (e) {
-        console.error('Erro ao enviar e-mails da vaga nova:', e);
+        console.error('Erro ao enviar push da vaga nova:', e);
     }
 }
+
+} else {
+    // UPDATE SLOT: mantém as vagas já ocupadas, só ajusta o que sobra.
+    const { data: cur, error: eCur } = await _supabase
+        .from('slots')
+        .select('id, quantity, total_capacity, available_capacity')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (eCur) {
+        error = eCur;
     } else {
-        // UPDATE SLOT: mantém as vagas já ocupadas, só ajusta o que sobra.
-        const { data: cur, error: eCur } = await _supabase
-            .from('slots')
-            .select('id, quantity, total_capacity, available_capacity')
-            .eq('id', id)
-            .maybeSingle();
-        if (eCur) return alert("Erro ao carregar slot: " + eCur.message);
-
-        const curTotal = Number(cur?.total_capacity ?? cur?.quantity ?? 0) || 0;
-        const curAvail = Number(cur?.available_capacity ?? Math.max(curTotal, 0)) || 0;
-        const ocupadas = Math.max(0, curTotal - Math.max(0, Math.min(curAvail, curTotal)));
-
-        const newAvail = Math.max(0, newTotal - ocupadas);
+        const oldTotal = Number(cur?.total_capacity ?? cur?.quantity ?? 0);
+        const oldAvail = Number(cur?.available_capacity ?? 0);
+        const occupied = Math.max(0, oldTotal - oldAvail);
+        const newAvail = Math.max(0, newTotal - occupied);
 
         const payload = {
             ...payloadBase,
-            quantity: newTotal,             // legado
-            total_capacity: newTotal,       // TOTAL CADASTRADO
-            available_capacity: newAvail    // DISPONÍVEIS (ajustada)
+            quantity: newTotal,
+            total_capacity: newTotal,
+            available_capacity: newAvail
         };
 
-        const res = await _supabase.from('slots').update(payload).eq('id', id);
-        error = res.error;
-    }
+        const res = await _supabase
+            .from('slots')
+            .update(payload)
+            .eq('id', id);
 
-    if (error) {
-        alert("Erro ao guardar: " + error.message);
-    } else {
-        document.getElementById('edit-slot-id').value = "";
-        closeSlotModal();
-        renderMarketTab('slots');
+        error = res.error;
     }
 }
 
+if (error) {
+    alert("Erro ao guardar: " + error.message);
+} else {
+    document.getElementById('edit-slot-id').value = "";
+    closeSlotModal();
+    renderMarketTab('slots');
+}
+}
 
 // Certifique-se de que a função de fechar o modal também limpa o ID
 function closeSlotModal() {
