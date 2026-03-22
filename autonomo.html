@@ -456,10 +456,10 @@ async function cancelarReservaAutomaticamente(reserva, motivo = '', perdaPontos 
 }
 
     try {
-        if (slot.store_id) notifyStoreUsers(slot.store_id, reserva?.slots?.date || null);
-    } catch (_) {}
+    await notifyAvailableSlot(sid);
+} catch (_) {}
 
-    console.log(`Reserva ${reserva.id} cancelada. Motivo: ${motivo}. Perda: ${perdaPontos}`);
+console.log(`Reserva ${reserva.id} cancelada. Motivo: ${motivo}. Perda: ${perdaPontos}`);
 }
 
 async function enforceLowPointsRules() {
@@ -2347,8 +2347,8 @@ await enforcePreShiftRules();
 alert("Missão cancelada com sucesso!");
 renderAgenda();
 
-// 3. DISPARA A NOTIFICAÇÃO (Aqui o e-mail vai sair)
-notifyStoreUsers(slot.store_id, dataVaga);
+// 3. DISPARA A NOTIFICAÇÃO PUSH
+await notifyAvailableSlot(sid);
 
     } catch (err) {
         console.error("Erro no cancelamento:", err);
@@ -2357,39 +2357,23 @@ notifyStoreUsers(slot.store_id, dataVaga);
         showLoading(false);
     }
 }
-async function notifyStoreUsers(storeId, date) {
-    console.log("Notificando utilizadores da loja:", storeId);
-    
-    // Busca utilizadores aprovados desta loja
-    const { data: users } = await _sb
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('status', 'aprovado')
-        .eq('store_id', storeId);
-
-    // Busca quem já tem reserva para este dia
-    const { data: booked } = await _sb
-        .from('reservations')
-        .select('profile_id, slots!inner(date)')
-        .eq('slots.date', date);
-
-    const busyIds = new Set(booked?.map(r => r.profile_id) || []);
-    
-    // Filtra quem é da loja e NÃO tem reserva no dia
-    const targets = users.filter(u => !busyIds.has(u.id));
-
-    if (targets.length === 0) return;
-
-    targets.forEach(user => {
-        emailjs.send('service_277hapn', 'template_gxhs8bv', {
-            to_name: user.full_name,
-            to_email: user.email,
-            assunto_texto: "⚠️ Uma nova missão foi lançada na sua loja!",
-            status_rotulo: "Missão disponível",
-            mensagem_corpo: `Olá ${user.full_name}, um colega desistiu de uma missão para o dia ${date}. Ela acabou de ficar disponível novamente!`
+async function notifyAvailableSlot(slotId) {
+    try {
+        const { data, error } = await _sb.functions.invoke('notify-new-slot', {
+            body: { slot_id: slotId }
         });
-    });
+
+        if (error) {
+            console.error('Erro ao disparar notify-new-slot:', error);
+            return;
+        }
+
+        console.log('notify-new-slot executada com sucesso:', data);
+    } catch (e) {
+        console.error('Erro ao disparar notify-new-slot:', e);
+    }
 }
+
 
         
 // ==========================
