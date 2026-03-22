@@ -653,10 +653,24 @@ enableNotificationsBtn?.addEventListener('click', async () => {
         applicationServerKey: urlBase64ToUint8Array('BBJ1NfRn7E1xtmeAfvMJFssme9lGTQtce9a23yIehJ2PDlW8fOZl52GYQwld5EcQqd9sP8t_X0Ko0OVj9x5qv5k')
       });
     }
-        console.log('PUSH_SUBSCRIPTION', JSON.stringify(subscription));
+        await savePushSubscription(subscription);
+
+await savePushSubscription(subscription);
+
+console.log('PUSH_SUBSCRIPTION', JSON.stringify(subscription));
 localStorage.setItem('pushEnabled', 'true');
 hidePwaModal();
-alert('Notificações ativadas com sucesso.');
+
+const role = (window.__lastProfile?.role || '').trim().toLowerCase();
+
+if (role === 'admin') {
+  window.location.href = 'admin.html';
+} else if (role === 'gerente' || role === 'manager') {
+  window.location.href = 'gerente.html';
+} else {
+  window.location.href = 'autonomo.html';
+}
+
   } catch (error) {
     console.error('Erro ao ativar notificações:', error);
     alert('Erro ao ativar notificações.');
@@ -684,11 +698,8 @@ closePwaModal?.addEventListener('click', () => {
   hidePwaModal();
 });
 
-const pushAlreadyEnabled = localStorage.getItem('pushEnabled') === 'true';
-
-if (!pushAlreadyEnabled) {
-  showPwaModal();
-}
+// não pedir notificações na tela de login/cadastro
+hidePwaModal();
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
@@ -939,6 +950,7 @@ document.getElementById('btn-login').onclick = async () => {
         alert('Perfil não encontrado. Complete seu cadastro.');
         return;
     }
+    window.__lastProfile = profile;
 
     // 3. Lógica de Redirecionamento e Status
     const icon = document.getElementById('status-icon');
@@ -982,14 +994,20 @@ document.getElementById('btn-login').onclick = async () => {
 
     const role = (profile?.role || '').trim().toLowerCase();
 
-    if (role === 'admin') {
-        window.location.href = 'admin.html';
-    } else if (role === 'gerente' || role === 'manager') {
-        window.location.href = 'gerente.html';
-    } else {
-        // PADRÃO PARA AUTÔNOMO
-        window.location.href = 'autonomo.html';
-    }
+    const pushAlreadyEnabled = localStorage.getItem('pushEnabled') === 'true';
+
+if (!pushAlreadyEnabled) {
+    showPwaModal();
+    return;
+}
+
+if (role === 'admin') {
+    window.location.href = 'admin.html';
+} else if (role === 'gerente' || role === 'manager') {
+    window.location.href = 'gerente.html';
+} else {
+    window.location.href = 'autonomo.html';
+}
 };
 
 /* BOTÃO CORRIGIR APÓS REPROVAÇÃO (COM PREFILL + UPDATE) */
@@ -1460,6 +1478,33 @@ prev.onclick = () => {
       }
     });
   }
+async function savePushSubscription(subscription) {
+  const { data: userData, error: userError } = await _supabase.auth.getUser();
+
+  if (userError || !userData?.user) {
+    throw new Error('Usuário não autenticado para salvar notificações.');
+  }
+
+  const user = userData.user;
+  const json = subscription.toJSON();
+
+  const payload = {
+    user_id: user.id,
+    endpoint: json.endpoint,
+    p256dh: json.keys?.p256dh || '',
+    auth: json.keys?.auth || '',
+    user_agent: navigator.userAgent
+  };
+
+  const { error } = await _supabase
+    .from('push_subscriptions')
+    .upsert(payload, { onConflict: 'endpoint' });
+
+  if (error) {
+    throw error;
+  }
+}
+
 </script>
 
 </body>
