@@ -3849,14 +3849,18 @@ async function editSlot(id) {
 }
 
 async function saveSlot() {
-    const id = document.getElementById('edit-slot-id').value;
-    const newTotal = parseInt(document.getElementById('s-slot-qty').value);
-    const payloadBase = {
-        store_id: document.getElementById('s-slot-store').value,
-        shift_id: document.getElementById('s-slot-shift').value,
-        date: document.getElementById('s-slot-date').value,
-        value: parseFloat(document.getElementById('s-slot-value').value)
-    };
+    if (window.__savingSlot) return;
+    window.__savingSlot = true;
+
+    try {
+        const id = document.getElementById('edit-slot-id').value;
+        const newTotal = parseInt(document.getElementById('s-slot-qty').value);
+        const payloadBase = {
+            store_id: document.getElementById('s-slot-store').value,
+            shift_id: document.getElementById('s-slot-shift').value,
+            date: document.getElementById('s-slot-date').value,
+            value: parseFloat(document.getElementById('s-slot-value').value)
+        };
 
     if (!payloadBase.store_id || !payloadBase.date) return alert("Preencha os campos obrigatórios");
     if (!Number.isFinite(newTotal) || newTotal < 0) return alert("Quantidade total inválida");
@@ -3922,13 +3926,19 @@ error = res.error;
     }
 }
 
-if (error) {
-    alert("Erro ao guardar: " + error.message);
-} else {
-    document.getElementById('edit-slot-id').value = "";
-    closeSlotModal();
-    renderMarketTab('slots');
-}
+ if (error) {
+            alert("Erro ao guardar: " + error.message);
+        } else {
+            document.getElementById('edit-slot-id').value = "";
+            closeSlotModal();
+            renderMarketTab('slots');
+        }
+    } catch (err) {
+        console.error('Erro em saveSlot:', err);
+        alert('Erro ao salvar vaga: ' + (err.message || err));
+    } finally {
+        window.__savingSlot = false;
+    }
 }
 
 // Certifique-se de que a função de fechar o modal também limpa o ID
