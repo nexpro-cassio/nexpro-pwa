@@ -418,22 +418,29 @@ async function cancelarReservaAutomaticamente(reserva, motivo = '', perdaPontos 
 
 if (delError) throw delError;
 
+const cancelReason = motivo.includes('a caminho')
+    ? 'missed_on_the_way'
+    : motivo.includes('check-in')
+    ? 'missed_checkin'
+    : motivo.includes('pontuação abaixo de 60')
+    ? 'points_below_minimum'
+    : 'user_cancelled';
+
 // 🔔 notifica o próprio usuário
 const { data: cancelData, error: cancelErr } = await _sb.functions.invoke('notify-reservation-cancelled', {
     body: {
         user_id: currentUser.id,
         slot_id: sid,
-        reason: motivo.includes('a caminho')
-            ? 'missed_on_the_way'
-            : motivo.includes('check-in')
-            ? 'missed_checkin'
-            : motivo.includes('pontuação abaixo de 60')
-            ? 'points_below_minimum'
-            : 'user_cancelled'
+        reason: cancelReason
     }
 });
 
-console.log('notify-reservation-cancelled automático:', { cancelData, cancelErr });
+console.log('notify-reservation-cancelled automático:', {
+    motivo,
+    cancelReason,
+    cancelData,
+    cancelErr
+});
 
 if (cancelErr) {
     console.error('Erro ao enviar notificação de cancelamento automático:', cancelErr);
@@ -1114,10 +1121,12 @@ if (r.status === 'confirmada') {
         </button>
 
         <div class="grid grid-cols-2 gap-2 mt-2">
-            <button onclick="cancelar('${r.id}', '${s.id}', ${s.quantity}, '${s.date}')" 
-                class="btn-action bg-red-50 text-red-600 font-bold">
-                CANCELAR
-            </button>
+            <button
+    id="btn-cancelar-${r.id}"
+    onclick="cancelar('${r.id}', '${s.id}', ${s.quantity}, '${s.date}')"
+    class="btn-action bg-red-50 text-red-600 font-bold">
+    CANCELAR
+</button>
 
             <button
                 ${(!liberadoACaminho || jaConfirmouACaminho) ? 'disabled' : `onclick="confirmarACaminho('${r.id}')"`}
@@ -2302,16 +2311,38 @@ renderAgenda();
             }
         }
 
-       async function cancelar(rid, sid, qtd_param, dataVaga) {
+async function cancelar(rid, sid, qtd_param, dataVaga) {
+    if (!window.__cancelandoReservas) {
+        window.__cancelandoReservas = new Set();
+    }
+
+    if (window.__cancelandoReservas.has(rid)) return;
     if (!confirm("Confirmar cancelamento?")) return;
+
+    window.__cancelandoReservas.add(rid);
     showLoading(true);
 
     try {
         if ('Notification' in window && Notification.permission === 'default') {
-            try { Notification.requestPermission(); } catch(_) {}
+            try { Notification.requestPermission(); } catch (_) {}
         }
 
-        // BUSCA A QUANTIDADE REAL QUE ESTÁ NO BANCO AGORA
+        // confirma se a reserva ainda existe
+        const { data: reservaAtual, error: reservaErr } = await _sb
+            .from('reservations')
+            .select('id')
+            .eq('id', rid)
+            .maybeSingle();
+
+        if (reservaErr) throw reservaErr;
+
+        if (!reservaAtual) {
+            alert("Essa reserva já foi cancelada.");
+            await renderAgenda();
+            return;
+        }
+
+        // busca a quantidade atual da vaga
         const { data: slot, error: sError } = await _sb
             .from('slots')
             .select('store_id, quantity')
@@ -2323,50 +2354,61 @@ renderAgenda();
         const hoje = todayLocalISO();
         const perda = (dataVaga === hoje) ? 20 : 10;
 
-        // 1. DEVOLVE A VAGA AO ADM (Soma +1 ao valor REAL que veio do banco)
+        // devolve a vaga
         const { error: upError } = await _sb
             .from('slots')
-            .update({ quantity: slot.quantity + 1 })
+            .update({ quantity: Number(slot.quantity || 0) + 1 })
             .eq('id', sid);
-        
+
         if (upError) throw upError;
 
-       await _sb.rpc('deduct_points', { user_id: currentUser.id, amount: perda });
-await _sb.from('reservations').delete().eq('id', rid);
+        // desconta pontos
+        const { error: pErr } = await _sb.rpc('deduct_points', {
+            user_id: currentUser.id,
+            amount: perda
+        });
 
-// notifica o próprio autônomo
-const { data: cancelData, error: cancelErr } = await _sb.functions.invoke('notify-reservation-cancelled', {
-    body: {
-        user_id: currentUser.id,
-        slot_id: sid,
-        reason: 'user_cancelled'
-    }
-});
+        if (pErr) throw pErr;
 
-console.log('notify-reservation-cancelled manual:', { cancelData, cancelErr });
+        // exclui a reserva
+        const { error: delErr } = await _sb
+            .from('reservations')
+            .delete()
+            .eq('id', rid);
 
-if (cancelErr) {
-    console.error('Erro ao enviar notificação de cancelamento manual:', cancelErr);
-}
+        if (delErr) throw delErr;
 
-// atualiza pontos e aplica cancelamentos automáticos
-await loadProfile();
-await enforceLowPointsRules();
-await enforcePreShiftRules();
+        // notifica o próprio autônomo
+        const { data: cancelData, error: cancelErr } = await _sb.functions.invoke('notify-reservation-cancelled', {
+            body: {
+                user_id: currentUser.id,
+                slot_id: sid,
+                reason: 'user_cancelled'
+            }
+        });
 
-alert("Missão cancelada com sucesso!");
-renderAgenda();
+        console.log('notify-reservation-cancelled manual:', { cancelData, cancelErr });
 
-// notifica vaga reaberta para outros elegíveis
-await notifyAvailableSlot(sid, currentUser.id);
+        if (cancelErr) {
+            console.error('Erro ao enviar notificação de cancelamento manual:', cancelErr);
+        }
 
-// avisa os outros elegíveis que a vaga voltou
-await notifyAvailableSlot(sid);
+        // atualiza tela
+        await loadProfile();
+        await enforceLowPointsRules();
+        await enforcePreShiftRules();
+
+        alert("Missão cancelada com sucesso!");
+        await renderAgenda();
+
+        // notifica a vaga reaberta para outros, excluindo o próprio usuário
+        await notifyAvailableSlot(sid, currentUser.id);
 
     } catch (err) {
         console.error("Erro no cancelamento:", err);
-        alert("Erro ao processar: " + err.message);
+        alert("Erro ao processar: " + (err?.message || err));
     } finally {
+        window.__cancelandoReservas.delete(rid);
         showLoading(false);
     }
 }
@@ -2401,6 +2443,7 @@ async function notifyAvailableSlot(slotId, excludeUserId = null) {
 // - Ao atribuir, o gerente cria order_assignments com status 'pending_acceptance'
 // - Aqui o autônomo aceita/recusa e finaliza a tarefa
 // ==========================
+let cancelandoReservaIds = new Set();
 let ordersChannel = null;
 
 
