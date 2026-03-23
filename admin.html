@@ -4357,85 +4357,83 @@ async function confirmDeleteReserva(mode){
 
   const res = ctx.res;
   const reservationId = ctx.reservationId;
-  const slotId = ctx.slotId;}
+  const slotId = ctx.slotId;
 
-  // 1) Deleta a reserva
-const { error: eDel } = await _supabase.from('reservations').delete().eq('id', reservationId);
-if (eDel) throw eDel;
+  const total = Number(res?.slots?.total_capacity ?? res?.slots?.quantity ?? 0);
+  const avail = Number(res?.slots?.available_capacity ?? 0);
 
-// 2) Ajusta capacidades exatamente conforme regra do negócio
-let newTotal = total;
-let newAvail = avail;
+  const { error: eDel } = await _supabase.from('reservations').delete().eq('id', reservationId);
+  if (eDel) throw eDel;
 
-if (mode === 'return') {
-  newAvail = Math.min(newAvail + 1, newTotal);
-} else if (mode === 'block') {
-  newAvail = Math.min(newAvail + 1, newTotal);
-  newTotal = Math.max(newTotal - 1, 0);
-  newAvail = Math.min(newAvail, newTotal);
-}
+  let newTotal = total;
+  let newAvail = avail;
 
-
-// Persiste nos novos campos + legado
-const { error: eUp } = await _supabase
-  .from('slots')
-  .update({
-    quantity: newTotal,
-    total_capacity: newTotal,
-    available_capacity: newAvail
-  })
-  .eq('id', slotId);
-if (eUp) throw eUp;
-
-// 3) Envia PUSH para o autônomo afetado
-try {
-  const affectedUserId = res?.profile_id || res?.profiles?.id || null;
-  const affectedSlotId = slotId;
-
-  if (affectedUserId && affectedSlotId) {
-    await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-reservation-cancelled', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: affectedUserId,
-        slot_id: affectedSlotId,
-        reason: 'admin_cancelled'
-      })
-    });
-  } else {
-    console.warn('Não foi possível enviar push de cancelamento: faltou user_id ou slot_id.', {
-      affectedUserId,
-      affectedSlotId,
-      res
-    });
+  if (mode === 'return') {
+    newAvail = Math.min(newAvail + 1, newTotal);
+  } else if (mode === 'block') {
+    newAvail = Math.min(newAvail + 1, newTotal);
+    newTotal = Math.max(newTotal - 1, 0);
+    newAvail = Math.min(newAvail, newTotal);
   }
-} catch (err) {
-  console.error('Falha ao enviar push de cancelamento:', err);
-}
 
-// 4) Se a vaga voltou a ficar disponível, notifica os outros elegíveis
-try {
-  const affectedUserId = res?.profile_id || res?.profiles?.id || null;
-  const affectedSlotId = slotId;
+  const { error: eUp } = await _supabase
+    .from('slots')
+    .update({
+      quantity: newTotal,
+      total_capacity: newTotal,
+      available_capacity: newAvail
+    })
+    .eq('id', slotId);
+  if (eUp) throw eUp;
 
-  if (mode === 'return' && affectedSlotId) {
-    await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        slot_id: affectedSlotId,
-        exclude_user_id: affectedUserId
-      })
-    });
+  try {
+    const affectedUserId = res?.profile_id || res?.profiles?.id || null;
+    const affectedSlotId = slotId;
+
+    if (affectedUserId && affectedSlotId) {
+      await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-reservation-cancelled', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: affectedUserId,
+          slot_id: affectedSlotId,
+          reason: 'admin_cancelled'
+        })
+      });
+    }
+  } catch (err) {
+    console.error('Falha ao enviar push de cancelamento:', err);
   }
-} catch (err) {
-  console.error('Falha ao enviar push de nova vaga disponível:', err);
+
+  try {
+    const affectedUserId = res?.profile_id || res?.profiles?.id || null;
+    const affectedSlotId = slotId;
+
+    if (mode === 'return' && affectedSlotId) {
+      await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slot_id: affectedSlotId,
+          exclude_user_id: affectedUserId
+        })
+      });
+    }
+  } catch (err) {
+    console.error('Falha ao enviar push de nova vaga disponível:', err);
+  }
+
+  alert('Reserva excluída com sucesso.');
+  closeDeleteReservaModal();
+  const container = document.getElementById('bookings-list-body');
+  if (container) filterBookingsRange();
 }
 
 alert('Reserva excluída com sucesso.');
 closeDeleteReservaModal();
 const container = document.getElementById('bookings-list-body');
 if (container) filterBookingsRange();
+
 
 // CORREÇÃO: Função Unificada de Troca de Módulos (Sidebar)
 async function switchTab(tab) {
