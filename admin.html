@@ -4357,109 +4357,85 @@ async function confirmDeleteReserva(mode){
 
   const res = ctx.res;
   const reservationId = ctx.reservationId;
-  const slotId = ctx.slotId;
+  const slotId = ctx.slotId;}
 
-  let emailWarn = '';
-  try {
-    // Busca slot atual
-    const { data: slotRow, error: eSlot } = await _supabase
-      .from('slots')
-      .select('id, quantity, total_capacity, available_capacity')
-      .eq('id', slotId)
-      .maybeSingle();
-    if (eSlot) throw eSlot;
+  // 1) Deleta a reserva
+const { error: eDel } = await _supabase.from('reservations').delete().eq('id', reservationId);
+if (eDel) throw eDel;
 
-    // Normaliza (se total_capacity ainda não existir em algum registro antigo)
-    const total = Number(slotRow?.total_capacity ?? slotRow?.quantity ?? 0) || 0;
-    const avail = Number(slotRow?.available_capacity ?? total) || 0;
+// 2) Ajusta capacidades exatamente conforme regra do negócio
+let newTotal = total;
+let newAvail = avail;
 
-    // 1) Deleta a reserva
-    const { error: eDel } = await _supabase.from('reservations').delete().eq('id', reservationId);
-    if (eDel) throw eDel;
-
-    // 2) Ajusta capacidades exatamente conforme regra do negócio
-    let newTotal = total;
-    let newAvail = avail;
-
-    if (mode === 'return') {
-      // devolve 1 vaga ao pool (sem alterar total)
-      newAvail = Math.min(newAvail + 1, newTotal);
-    } else if (mode === 'block') {
-      // devolve a vaga e em seguida bloqueia 1 do total (total diminui)
-      // passo 1: devolve
-      newAvail = Math.min(newAvail + 1, newTotal);
-      // passo 2: bloqueia
-      newTotal = Math.max(newTotal - 1, 0);
-      newAvail = Math.min(newAvail, newTotal);
-    }
-
-    // Persiste nos novos campos + legado (quantity espelha total cadastrado)
-    const { error: eUp } = await _supabase
-      .from('slots')
-      .update({
-        quantity: newTotal,
-        total_capacity: newTotal,
-        available_capacity: newAvail
-      })
-      .eq('id', slotId);
-    if (eUp) throw eUp;
-
-  // 3) Envia e-mail (usa os dados já carregados antes de deletar)
-    try {
-      const toEmail = String(res?.profiles?.email || '').trim();
-      const toName = String(res?.profiles?.full_name || 'Autônomo').trim();
-
-      const loja = res?.slots?.stores?.name || '---';
-      const data = res?.slots?.date || '';
-      const turno = res?.slots?.shifts?.name || '---';
-      const st = res?.slots?.shifts?.start_time || '';
-      const en = res?.slots?.shifts?.end_time || '';
-      const horario = (st && en) ? `${String(st).slice(0,5)} — ${String(en).slice(0,5)}` : '';
-
-      if (!toEmail) {
-        console.warn('Reserva excluída, mas o autônomo não tem e-mail em profiles.email.');
-      } else {
-        if (!window.__emailjs_inited) {
-          emailjs.init("WIcu3KkF0JGDXdg48");
-          window.__emailjs_inited = true;
-        }
-
-        const dataBR = String(data).includes('-') ? String(data).split('-').reverse().join('/') : String(data);
-
-        const msg =
-          `Olá, ${toName}.\n\n` +
-          `Sua reserva foi excluída pelo administrador.\n` +
-          (mode === 'block'
-            ? `A vaga foi BLOQUEADA.\n\n`
-            : `A vaga foi DEVOLVIDA e ficou disponível novamente.\n\n`
-          ) +
-          `Loja: ${loja}\n` +
-          `Data: ${dataBR || '---'}\n` +
-          `Turno: ${turno}${horario ? ' (' + horario + ')' : ''}\n\n` +
-          `AgilConex`;
-
-        await emailjs.send('service_277hapn', 'template_gxhs8bv', {
-          to_email: toEmail,
-          to_name: toName,
-          assunto_texto: 'Reserva excluída',
-          status_rotulo: '🗑️ EXCLUÍDA',
-          mensagem_corpo: msg
-        });
-      }
-    } catch (err) {
-      console.error('Falha ao enviar e-mail de exclusão:', err);
-      alert('Reserva excluída, MAS FALHOU ENVIAR E-MAIL. Abra o Console (F12) e veja o erro.');
-    }
-    alert('Reserva excluída com sucesso.');
-    closeDeleteReservaModal();
-    // Recarrega a aba mantendo filtros
-    const container = document.getElementById('bookings-list-body');
-    if (container) filterBookingsRange();
-  } catch (e) {
-    console.error('Erro ao excluir reserva:', e);
-    alert('Erro ao excluir reserva: ' + (e?.message || String(e)));
-  }
+if (mode === 'return') {
+  newAvail = Math.min(newAvail + 1, newTotal);
+} else if (mode === 'block') {
+  newAvail = Math.min(newAvail + 1, newTotal);
+  newTotal = Math.max(newTotal - 1, 0);
+  newAvail = Math.min(newAvail, newTotal);
 }
+
+
+// Persiste nos novos campos + legado
+const { error: eUp } = await _supabase
+  .from('slots')
+  .update({
+    quantity: newTotal,
+    total_capacity: newTotal,
+    available_capacity: newAvail
+  })
+  .eq('id', slotId);
+if (eUp) throw eUp;
+
+// 3) Envia PUSH para o autônomo afetado
+try {
+  const affectedUserId = res?.profile_id || res?.profiles?.id || null;
+  const affectedSlotId = slotId;
+
+  if (affectedUserId && affectedSlotId) {
+    await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-reservation-cancelled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: affectedUserId,
+        slot_id: affectedSlotId,
+        reason: 'admin_cancelled'
+      })
+    });
+  } else {
+    console.warn('Não foi possível enviar push de cancelamento: faltou user_id ou slot_id.', {
+      affectedUserId,
+      affectedSlotId,
+      res
+    });
+  }
+} catch (err) {
+  console.error('Falha ao enviar push de cancelamento:', err);
+}
+
+// 4) Se a vaga voltou a ficar disponível, notifica os outros elegíveis
+try {
+  const affectedUserId = res?.profile_id || res?.profiles?.id || null;
+  const affectedSlotId = slotId;
+
+  if (mode === 'return' && affectedSlotId) {
+    await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slot_id: affectedSlotId,
+        exclude_user_id: affectedUserId
+      })
+    });
+  }
+} catch (err) {
+  console.error('Falha ao enviar push de nova vaga disponível:', err);
+}
+
+alert('Reserva excluída com sucesso.');
+closeDeleteReservaModal();
+const container = document.getElementById('bookings-list-body');
+if (container) filterBookingsRange();
 
 // CORREÇÃO: Função Unificada de Troca de Módulos (Sidebar)
 async function switchTab(tab) {

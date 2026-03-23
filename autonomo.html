@@ -412,51 +412,30 @@ async function cancelarReservaAutomaticamente(reserva, motivo = '', perdaPontos 
     }
 
     const { error: delError } = await _sb
-        .from('reservations')
-        .delete()
-        .eq('id', reserva.id);
+    .from('reservations')
+    .delete()
+    .eq('id', reserva.id);
 
-    if (delError) throw delError;
+if (delError) throw delError;
 
-    try {
-    const nome = currentUser?.full_name ?? 'Autônomo';
-    const email = currentUser?.email;
-
-    if (email) {
-        let mensagemMotivo = '';
-        let tituloMotivo = '';
-
-        if (motivo.includes('a caminho')) {
-            tituloMotivo = 'falta de confirmação de "a caminho"';
-            mensagemMotivo = 'não houve a confirmação de "a caminho" dentro do prazo previsto';
-        } else if (motivo.includes('check-in')) {
-            tituloMotivo = 'ausência de check-in';
-            mensagemMotivo = 'o check-in não foi realizado no tempo estabelecido para a missão';
-        } else {
-            tituloMotivo = 'falta de confirmação';
-            mensagemMotivo = 'não houve confirmação dentro do prazo previsto';
-        }
-
-        await emailjs.send('service_277hapn', 'template_gxhs8bv', {
-            to_name: nome,
-            to_email: email,
-            assunto_texto: 'Reserva cancelada por ' + tituloMotivo,
-            status_rotulo: 'RESERVA CANCELADA',
-            mensagem_corpo:
-                `Olá, ${nome}.\n\n` +
-                `Informamos que a sua reserva foi cancelada automaticamente, pois ${mensagemMotivo}.\n\n` +
-                `Quando essa confirmação não acontece dentro do período exigido, a reserva é liberada novamente para disponibilidade no sistema.\n\n` +
-                `Recomendamos que, nas próximas reservas, acompanhe atentamente os horários para confirmação e realização do check-in, para evitar novos cancelamentos.\n\n` +
-                `Em caso de dúvida, entre em contato com a equipe de suporte.\n\n` +
-                `Nexo`
-        });
+// 🔔 notifica o próprio usuário
+await _sb.functions.invoke('notify-reservation-cancelled', {
+    body: {
+        user_id: currentUser.id,
+        slot_id: sid,
+        reason: motivo.includes('a caminho')
+            ? 'missed_on_the_way'
+            : motivo.includes('check-in')
+            ? 'missed_checkin'
+            : motivo.includes('pontuação abaixo de 60')
+            ? 'points_below_minimum'
+            : 'user_cancelled'
     }
-} catch (mailErr) {
-    console.error('Erro ao enviar e-mail:', mailErr);
-}
+});
 
-    try {
-    await notifyAvailableSlot(sid);
+// 🔔 notifica outros elegíveis
+try {
+    await notifyAvailableSlot(sid, currentUser.id);
 } catch (_) {}
 
 console.log(`Reserva ${reserva.id} cancelada. Motivo: ${motivo}. Perda: ${perdaPontos}`);
