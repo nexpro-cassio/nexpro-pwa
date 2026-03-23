@@ -4405,34 +4405,11 @@ async function confirmDeleteReserva(mode){
     console.error('Falha ao enviar push de cancelamento:', err);
   }
 
-  try {
-    const affectedUserId = res?.profile_id || res?.profiles?.id || null;
-    const affectedSlotId = slotId;
-
-    if (mode === 'return' && affectedSlotId) {
-      await fetch('https://peluzcmwjbqodtjjxddy.supabase.co/functions/v1/notify-new-slot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slot_id: affectedSlotId,
-          exclude_user_id: affectedUserId
-        })
-      });
-    }
-  } catch (err) {
-    console.error('Falha ao enviar push de nova vaga disponível:', err);
-  }
-
   alert('Reserva excluída com sucesso.');
   closeDeleteReservaModal();
   const container = document.getElementById('bookings-list-body');
   if (container) filterBookingsRange();
 }
-
-alert('Reserva excluída com sucesso.');
-closeDeleteReservaModal();
-const container = document.getElementById('bookings-list-body');
-if (container) filterBookingsRange();
 
 
 // CORREÇÃO: Função Unificada de Troca de Módulos (Sidebar)

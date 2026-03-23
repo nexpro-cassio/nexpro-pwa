@@ -419,7 +419,7 @@ async function cancelarReservaAutomaticamente(reserva, motivo = '', perdaPontos 
 if (delError) throw delError;
 
 // 🔔 notifica o próprio usuário
-await _sb.functions.invoke('notify-reservation-cancelled', {
+const { data: cancelData, error: cancelErr } = await _sb.functions.invoke('notify-reservation-cancelled', {
     body: {
         user_id: currentUser.id,
         slot_id: sid,
@@ -433,10 +433,18 @@ await _sb.functions.invoke('notify-reservation-cancelled', {
     }
 });
 
+console.log('notify-reservation-cancelled automático:', { cancelData, cancelErr });
+
+if (cancelErr) {
+    console.error('Erro ao enviar notificação de cancelamento automático:', cancelErr);
+}
+
 // 🔔 notifica outros elegíveis
 try {
     await notifyAvailableSlot(sid, currentUser.id);
-} catch (_) {}
+} catch (e) {
+    console.error('Erro ao notificar vaga reaberta:', e);
+}
 
 console.log(`Reserva ${reserva.id} cancelada. Motivo: ${motivo}. Perda: ${perdaPontos}`);
 }
@@ -516,6 +524,14 @@ subscribeProfileRealtime();
 
 await enforceLowPointsRules();
 await enforcePreShiftRules();
+
+setInterval(async () => {
+    try {
+        await enforcePreShiftRules();
+    } catch (e) {
+        console.error('Erro no monitoramento de pré-turno:', e);
+    }
+}, 60000);
 
     const __r = (window.__profile?.role || '').trim().toLowerCase();
     if (__r === 'admin') { window.location.href = 'admin.html'; return; }
@@ -2315,8 +2331,23 @@ renderAgenda();
         
         if (upError) throw upError;
 
-        await _sb.rpc('deduct_points', { user_id: currentUser.id, amount: perda });
+       await _sb.rpc('deduct_points', { user_id: currentUser.id, amount: perda });
 await _sb.from('reservations').delete().eq('id', rid);
+
+// notifica o próprio autônomo
+const { data: cancelData, error: cancelErr } = await _sb.functions.invoke('notify-reservation-cancelled', {
+    body: {
+        user_id: currentUser.id,
+        slot_id: sid,
+        reason: 'user_cancelled'
+    }
+});
+
+console.log('notify-reservation-cancelled manual:', { cancelData, cancelErr });
+
+if (cancelErr) {
+    console.error('Erro ao enviar notificação de cancelamento manual:', cancelErr);
+}
 
 // atualiza pontos e aplica cancelamentos automáticos
 await loadProfile();
@@ -2326,7 +2357,10 @@ await enforcePreShiftRules();
 alert("Missão cancelada com sucesso!");
 renderAgenda();
 
-// 3. DISPARA A NOTIFICAÇÃO PUSH
+// notifica vaga reaberta para outros elegíveis
+await notifyAvailableSlot(sid, currentUser.id);
+
+// avisa os outros elegíveis que a vaga voltou
 await notifyAvailableSlot(sid);
 
     } catch (err) {
@@ -2336,10 +2370,16 @@ await notifyAvailableSlot(sid);
         showLoading(false);
     }
 }
-async function notifyAvailableSlot(slotId) {
+async function notifyAvailableSlot(slotId, excludeUserId = null) {
     try {
+        const body = { slot_id: slotId };
+
+        if (excludeUserId) {
+            body.exclude_user_id = excludeUserId;
+        }
+
         const { data, error } = await _sb.functions.invoke('notify-new-slot', {
-            body: { slot_id: slotId }
+            body
         });
 
         if (error) {
