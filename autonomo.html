@@ -385,7 +385,6 @@ function hasMissedCheckinWindow(slot) {
 }
 
 async function cancelarReservaAutomaticamente(reserva, motivo = '', perdaPontos = 0) {
-    return;
     const sid = reserva.vacancy_id || reserva.slot_id || reserva.slots?.id;
     if (!sid) return;
 
