@@ -327,6 +327,49 @@ function getDelayBadge(r) {
 
     return '';
 }
+
+async function enforcePreShiftRules() {
+    const hoje = todayLocalISO();
+    const agora = new Date();
+
+    const { data: reservas, error } = await _sb
+        .from('reservations')
+        .select(`
+            *,
+            slots:vacancy_id(
+                id,
+                date,
+                store_id,
+                shifts(*)
+            )
+        `)
+        .eq('profile_id', currentUser.id)
+        .eq('status', 'confirmada');
+
+    if (error) {
+        console.error('Erro ao aplicar regra de pré-turno:', error);
+        return;
+    }
+
+    for (const r of (reservas || [])) {
+        const slot = r.slots;
+        if (!slot) continue;
+        if (slot.date !== hoje) continue;
+        if (r.on_the_way_at) continue;
+
+        const prazoFinalACaminho = getOnTheWayDeadline(r, slot);
+
+if (prazoFinalACaminho && agora > prazoFinalACaminho) {
+    await cancelarReservaAutomaticamente(
+        r,
+        'não confirmou "a caminho" no prazo',
+        25
+    );
+}
+    }
+
+    await loadProfile();
+}
 function hasMissedCheckinWindow(slot) {
     try {
         const date = slot?.date;
@@ -339,6 +382,78 @@ function hasMissedCheckinWindow(slot) {
     } catch (_) {
         return false;
     }
+}
+
+async function cancelarReservaAutomaticamente(reserva, motivo = '', perdaPontos = 0) {
+    const sid = reserva.vacancy_id || reserva.slot_id || reserva.slots?.id;
+    if (!sid) return;
+
+    const { data: slot, error: sError } = await _sb
+        .from('slots')
+        .select('id, store_id, quantity')
+        .eq('id', sid)
+        .single();
+
+    if (sError) throw sError;
+
+    const { error: upError } = await _sb
+        .from('slots')
+        .update({ quantity: Number(slot.quantity || 0) + 1 })
+        .eq('id', sid);
+
+    if (upError) throw upError;
+
+    if (perdaPontos > 0) {
+        const { error: pErr } = await _sb.rpc('deduct_points', {
+            user_id: currentUser.id,
+            amount: perdaPontos
+        });
+        if (pErr) throw pErr;
+    }
+
+    const { error: delError } = await _sb
+    .from('reservations')
+    .delete()
+    .eq('id', reserva.id);
+
+if (delError) throw delError;
+
+const cancelReason = motivo.includes('a caminho')
+    ? 'missed_on_the_way'
+    : motivo.includes('check-in')
+    ? 'missed_checkin'
+    : motivo.includes('pontuação abaixo de 60')
+    ? 'points_below_minimum'
+    : 'user_cancelled';
+
+// 🔔 notifica o próprio usuário
+const { data: cancelData, error: cancelErr } = await _sb.functions.invoke('notify-reservation-cancelled', {
+    body: {
+        user_id: currentUser.id,
+        slot_id: sid,
+        reason: cancelReason
+    }
+});
+
+console.log('notify-reservation-cancelled automático:', {
+    motivo,
+    cancelReason,
+    cancelData,
+    cancelErr
+});
+
+if (cancelErr) {
+    console.error('Erro ao enviar notificação de cancelamento automático:', cancelErr);
+}
+
+// 🔔 notifica outros elegíveis
+try {
+    await notifyAvailableSlot(sid, currentUser.id);
+} catch (e) {
+    console.error('Erro ao notificar vaga reaberta:', e);
+}
+
+console.log(`Reserva ${reserva.id} cancelada. Motivo: ${motivo}. Perda: ${perdaPontos}`);
 }
 
 async function enforceLowPointsRules() {
@@ -374,10 +489,28 @@ async function enforceLowPointsRules() {
         const status = normStatus(r.status);
         const dataReserva = slot.date;
 
+        // Futuras: cancela se estiver confirmada
+        if (dataReserva > hoje && status === 'confirmada') {
+            await cancelarReservaAutomaticamente(
+                r,
+                'pontuação abaixo de 60 - cancelamento automático de agenda futura',
+                0
+            );
+            continue;
+        }
 
         // Hoje: se já está em andamento, mantém
         if (dataReserva === hoje && (status === 'check-in' || status === 'pausa')) {
             continue;
+        }
+
+        // Hoje: se não fez check-in em até 40 min, cancela e tira 40 pontos
+        if (dataReserva === hoje && status === 'confirmada' && hasMissedCheckinWindow(slot)) {
+            await cancelarReservaAutomaticamente(
+                r,
+                'não fez check-in em até 40 minutos do início do turno',
+                40
+            );
         }
     }
 
@@ -2262,6 +2395,8 @@ async function cancelar(rid, sid, qtd_param, dataVaga) {
 
         // atualiza tela
         await loadProfile();
+        await enforceLowPointsRules();
+        await enforcePreShiftRules();
 
         alert("Missão cancelada com sucesso!");
         await renderAgenda();
@@ -2338,6 +2473,10 @@ function subscribeProfileRealtime() {
                 async () => {
                     try {
                         await loadProfile();
+
+                        // reaplica regras locais se quiser manter tudo sincronizado
+                        await enforceLowPointsRules();
+                        await enforcePreShiftRules();
 
                         // se estiver na agenda, atualiza os cards
                         const agendaAtiva = document.getElementById('nav-agenda')?.classList.contains('active');
