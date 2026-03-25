@@ -520,23 +520,13 @@ async function enforceLowPointsRules() {
 async function init() {
     const { data: { session } } = await _sb.auth.getSession();
     if (!session) return window.location.href = '/index.html';
+
     currentUser = session.user;
     await loadProfile();
 
-    await enforceLowPointsRules();
-    await enforcePreShiftRules();
-    await loadProfile();
-
+    // As regras automáticas principais agora devem rodar no servidor
+    // (Edge Function + Scheduler), não mais no navegador do autônomo.
     subscribeProfileRealtime();
-
-    setInterval(async () => {
-    try {
-        await enforcePreShiftRules();
-        await enforceLowPointsRules();
-    } catch (e) {
-        console.error('Erro no monitoramento automático:', e);
-    }
-}, 60000);
 
     const __r = (window.__profile?.role || '').trim().toLowerCase();
     if (__r === 'admin') { window.location.href = 'admin.html'; return; }
