@@ -517,28 +517,13 @@ async function enforceLowPointsRules() {
     await loadProfile();
 }
 
-    async function init() {
+async function init() {
     const { data: { session } } = await _sb.auth.getSession();
     if (!session) return window.location.href = '/index.html';
     currentUser = session.user;
     await loadProfile();
 
-    await enforceLowPointsRules();
-    await enforcePreShiftRules();
-    await loadProfile();
-
-subscribeProfileRealtime();
-
-await enforceLowPointsRules();
-await enforcePreShiftRules();
-
-setInterval(async () => {
-    try {
-        await enforcePreShiftRules();
-    } catch (e) {
-        console.error('Erro no monitoramento de pré-turno:', e);
-    }
-}, 60000);
+    subscribeProfileRealtime();
 
     const __r = (window.__profile?.role || '').trim().toLowerCase();
     if (__r === 'admin') { window.location.href = 'admin.html'; return; }
@@ -2301,10 +2286,8 @@ if (!myStoreId || slot.store_id !== myStoreId) {
                 await _sb.from('slots').update({ quantity: qtyNow - 1 }).eq('id', sid);
 
                 await loadProfile();
-await enforceLowPointsRules();
-await enforcePreShiftRules();
-
 renderAgenda();
+
             } catch (e) {
                 alert("Erro ao aceitar: " + (e?.message || e));
                 showLoading(false);
@@ -2394,12 +2377,10 @@ async function cancelar(rid, sid, qtd_param, dataVaga) {
         }
 
         // atualiza tela
-        await loadProfile();
-        await enforceLowPointsRules();
-        await enforcePreShiftRules();
+await loadProfile();
 
-        alert("Missão cancelada com sucesso!");
-        await renderAgenda();
+alert("Missão cancelada com sucesso!");
+await renderAgenda();
 
         // notifica a vaga reaberta para outros, excluindo o próprio usuário
         await notifyAvailableSlot(sid, currentUser.id);
@@ -2473,10 +2454,6 @@ function subscribeProfileRealtime() {
                 async () => {
                     try {
                         await loadProfile();
-
-                        // reaplica regras locais se quiser manter tudo sincronizado
-                        await enforceLowPointsRules();
-                        await enforcePreShiftRules();
 
                         // se estiver na agenda, atualiza os cards
                         const agendaAtiva = document.getElementById('nav-agenda')?.classList.contains('active');
