@@ -523,7 +523,20 @@ async function init() {
     currentUser = session.user;
     await loadProfile();
 
+    await enforceLowPointsRules();
+    await enforcePreShiftRules();
+    await loadProfile();
+
     subscribeProfileRealtime();
+
+    setInterval(async () => {
+    try {
+        await enforcePreShiftRules();
+        await enforceLowPointsRules();
+    } catch (e) {
+        console.error('Erro no monitoramento automático:', e);
+    }
+}, 60000);
 
     const __r = (window.__profile?.role || '').trim().toLowerCase();
     if (__r === 'admin') { window.location.href = 'admin.html'; return; }
