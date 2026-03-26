@@ -1207,7 +1207,15 @@ const isPaid = (r) => {
             <td class="p-3 text-right font-extrabold">R$ ${formatBRL(e.liquido)}</td>
             <td class="p-3 text-xs">${periodo}</td>
             <td class="p-3 text-right">
-              ${canConfirm ? `<button type="button" class="px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700" onclick="confirmarPagamentoLote('${e.manager_id}')">Confirmar</button>` : `<span class="text-gray-400 font-bold">—</span>`}
+  ${canConfirm 
+    ? `<button 
+          onclick="confirmPayAndEmail('${e.profile_id}')" 
+          class="px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700">
+          Confirmar
+       </button>` 
+    : `<span class="text-gray-400 font-bold">—</span>`}
+</td>
+              ${canConfirm ? `<button type="button" class="px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700" >Confirmar</button>` : `<span class="text-gray-400 font-bold">—</span>`}
             </td>
           </tr>
         `;
@@ -4505,29 +4513,22 @@ async function confirmPayAndEmail(profileId, opts={}){
         await _supabase.from(st.resTable).update({ paid_at: paidAt, paid_amount: entry.liquido, paid_pix_key: pixUsed, paid_reference_days: [...new Set(entry.dias)].sort().join(', ') }).in('id', entry.reservaIds);
     }catch(e){ console.warn('Falha ao marcar pago:', e); }
 
-    // envia e-mail via EmailJS (usa template existente se você tiver)
-    // IMPORTANTE: ajuste service/template conforme o seu EmailJS
-    const toEmail = entry.email;
-    if(toEmail){
-                try{
-            const assunto_texto = 'Pagamento realizado';
-            const status_rotulo = 'Pagamento Confirmado';
-            const mensagem_corpo =
-                `Olá, ${entry.nome}.\n\n` +
-                `Confirmamos o envio do pagamento no valor de R$ ${Number(entry.liquido).toFixed(2)}.\n` +
-                `Chave PIX: ${pixUsed || 'não informada'}\n` +
-                `Referente aos dias: ${[...new Set(entry.dias)].sort().join(', ') || '-'}\n` +
-                `Data: ${new Date().toLocaleDateString('pt-BR')}\n\n` +
-                `Nexo`;
-            await emailjs.send('service_277hapn', 'template_gxhs8bv', {
-                to_name: entry.nome,
-                to_email: toEmail,
-                assunto_texto,
-                status_rotulo,
-                mensagem_corpo
-            });
-        }catch(e){ console.warn('Falha ao enviar e-mail:', e); }
+try {
+  const valorFmt = Number(entry.liquido || 0).toFixed(2).replace('.', ',');
+  const pixFmt = pixUsed || 'não informada';
+
+  const { data: pushData, error: pushError } = await _supabase.functions.invoke('send-push', {
+    body: {
+      user_id: profileId,
+      title: 'Pagamento confirmado 💰',
+      body: `Seu pagamento de R$ ${valorFmt} foi enviado para o PIX ${pixFmt}.`
     }
+  });
+
+  console.log('RETORNO send-push PAGAMENTO:', { pushData, pushError });
+} catch (e) {
+  console.warn('Falha ao enviar push de pagamento:', e);
+}
 
     if(!opts.silent){ alert('Pagamento confirmado.'); }
     if(!opts.silent){ renderAdminFinance(); }
@@ -4544,6 +4545,8 @@ async function confirmAllFinance(){
     for(const pid of ids){
         try{ await confirmPayAndEmail(pid, {silent:true}); ok++; }catch(e){ console.warn('Falha ao confirmar', pid, e); }
     }
+    alert(`${ok} pagamento(s) confirmado(s).`);
+    renderAdminFinance();
 }
 
 

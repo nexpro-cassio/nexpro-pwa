@@ -524,6 +524,11 @@ async function init() {
     currentUser = session.user;
     await loadProfile();
 
+    await _sb
+  .from('profiles')
+  .update({ last_app_open_at: new Date().toISOString() })
+  .eq('id', currentUser.id);
+
     // As regras automáticas principais agora devem rodar no servidor
     // (Edge Function + Scheduler), não mais no navegador do autônomo.
     subscribeProfileRealtime();
