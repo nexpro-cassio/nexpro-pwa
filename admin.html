@@ -4439,7 +4439,7 @@ async function confirmPayAndEmail(profileId, opts = {}) {
     paid_at: paidAt,
     paid_amount: entry.liquido,
     paid_pix_key: pixUsed,
-    paid_reference_days: [...new Set(entry.dias)].sort().join(', ')
+    paid_reference_days: `${entry.periodoMin || ''} até ${entry.periodoMax || ''}`
 })
                 .in('id', entry.reservaIds.map(r => r.id));
         } catch (e) {
