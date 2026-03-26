@@ -1202,21 +1202,23 @@ const isPaid = (r) => {
               <div class="text-xs text-gray-500">${e.email || ''}</div>
             </td>
             <td class="p-3">${e.pix || '<span class="text-red-600 font-bold">SEM PIX</span>'}</td>
-            <td class="p-3 text-right">R$ ${formatBRL(e.bruto)}</td>
+            R$ ${formatBRL(e.bruto)}</td>
             <td class="p-3 text-right">R$ ${formatBRL(e.desconto)}</td>
             <td class="p-3 text-right font-extrabold">R$ ${formatBRL(e.liquido)}</td>
             <td class="p-3 text-xs">${periodo}</td>
+            
             <td class="p-3 text-right">
-  ${canConfirm 
-    ? `<button 
-          onclick="confirmPayAndEmail('${e.profile_id}')" 
-          class="px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700">
-          Confirmar
-       </button>` 
+  ${canConfirm
+    ? `<button
+        type="button"
+        data-fin-confirm="${e.profile_id}"
+        onclick="confirmPayAndEmail('${e.profile_id}')"
+        class="px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700">
+        Confirmar
+      </button>`
     : `<span class="text-gray-400 font-bold">—</span>`}
 </td>
-              ${canConfirm ? `<button type="button" class="px-3 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700" >Confirmar</button>` : `<span class="text-gray-400 font-bold">—</span>`}
-            </td>
+
           </tr>
         `;
       }).join('');
@@ -4500,53 +4502,88 @@ async function switchTab(tab) {
 // (removido duplicado) renderAdminFinance redefinida acima
 
 
-async function confirmPayAndEmail(profileId, opts={}){
+async function confirmPayAndEmail(profileId, opts = {}) {
     const st = window.__financeState;
-    if(!st || !st.acc || !st.acc[profileId]) return;
-    const entry = st.acc[profileId];
+    if (!st || !st.acc || !st.acc[profileId]) return;
 
+    const entry = st.acc[profileId];
     const pixUsed = (entry.pix || '').trim();
 
-    const paidAt = new Date().toISOString();
-    // marca reservas como pagas (colunas opcionais, se existirem)
-    try{
-        await _supabase.from(st.resTable).update({ paid_at: paidAt, paid_amount: entry.liquido, paid_pix_key: pixUsed, paid_reference_days: [...new Set(entry.dias)].sort().join(', ') }).in('id', entry.reservaIds);
-    }catch(e){ console.warn('Falha ao marcar pago:', e); }
+    const btn = document.querySelector(`[data-fin-confirm="${profileId}"]`);
+    const lockKey = `finance-confirm-${profileId}`;
 
-try {
-  const valorFmt = Number(entry.liquido || 0).toFixed(2).replace('.', ',');
-  const pixFmt = pixUsed || 'não informada';
+    return withActionLock(lockKey, btn, async () => {
+        const paidAt = new Date().toISOString();
 
-  const { data: pushData, error: pushError } = await _supabase.functions.invoke('send-push', {
-    body: {
-      user_id: profileId,
-      title: 'Pagamento confirmado 💰',
-      body: `Seu pagamento de R$ ${valorFmt} foi enviado para o PIX ${pixFmt}.`
-    }
-  });
+        // marca reservas como pagas
+        try {
+            await _supabase
+                .from(st.resTable)
+                .update({
+                    paid_at: paidAt,
+                    paid_amount: entry.liquido,
+                    paid_pix_key: pixUsed,
+                    paid_reference_days: [...new Set(entry.dias)].sort().join(', ')
+                })
+                .in('id', entry.reservaIds);
+        } catch (e) {
+            console.warn('Falha ao marcar pago:', e);
+            throw e;
+        }
 
-  console.log('RETORNO send-push PAGAMENTO:', { pushData, pushError });
-} catch (e) {
-  console.warn('Falha ao enviar push de pagamento:', e);
+        // remove da lista local imediatamente para não confirmar de novo
+        delete st.acc[profileId];
+
+        try {
+            const valorFmt = Number(entry.liquido || 0).toFixed(2).replace('.', ',');
+            const pixFmt = pixUsed || 'não informada';
+
+            const { data: pushData, error: pushError } = await _supabase.functions.invoke('send-push', {
+                body: {
+                    user_id: profileId,
+                    title: 'Pagamento confirmado 💰',
+                    body: `Seu pagamento de R$ ${valorFmt} foi enviado para o PIX ${pixFmt}.`
+                }
+            });
+
+            console.log('RETORNO send-push PAGAMENTO:', { pushData, pushError });
+            if (pushError) console.warn('Push retornou erro:', pushError);
+        } catch (e) {
+            console.warn('Falha ao enviar push de pagamento:', e);
+        }
+
+        if (!opts.silent) {
+            alert('Pagamento confirmado.');
+            await renderAdminFinance();
+        }
+    });
 }
 
-    if(!opts.silent){ alert('Pagamento confirmado.'); }
-    if(!opts.silent){ renderAdminFinance(); }
-}
-
-async function confirmAllFinance(){
+async function confirmAllFinance() {
     const st = window.__financeState;
-    if(!st || !st.acc) return;
-    const ids = Object.keys(st.acc);
-    if(ids.length===0) return;
-    if(!confirm(`Confirmar pagamento de ${ids.length} autônomo(s)?`)) return;
+    if (!st || !st.acc) return;
 
-    let ok=0;
-    for(const pid of ids){
-        try{ await confirmPayAndEmail(pid, {silent:true}); ok++; }catch(e){ console.warn('Falha ao confirmar', pid, e); }
-    }
-    alert(`${ok} pagamento(s) confirmado(s).`);
-    renderAdminFinance();
+    const ids = Object.keys(st.acc);
+    if (ids.length === 0) return;
+
+    if (!confirm(`Confirmar pagamento de ${ids.length} autônomo(s)?`)) return;
+
+    const btn = document.getElementById('finance-confirm-all');
+    return withActionLock('finance-confirm-all', btn, async () => {
+        let ok = 0;
+
+        for (const pid of ids) {
+            try {
+                await confirmPayAndEmail(pid, { silent: true });
+                ok++;
+            } catch (e) {
+                console.warn('Falha ao confirmar', pid, e);
+            }
+        }
+
+        alert(`${ok} pagamento(s) confirmado(s).`);
+        await renderAdminFinance();
+    });
 }
 
 
