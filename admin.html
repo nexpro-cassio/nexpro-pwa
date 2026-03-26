@@ -1202,7 +1202,7 @@ const isPaid = (r) => {
               <div class="text-xs text-gray-500">${e.email || ''}</div>
             </td>
             <td class="p-3">${e.pix || '<span class="text-red-600 font-bold">SEM PIX</span>'}</td>
-            R$ ${formatBRL(e.bruto)}</td>
+<td class="p-3 text-right">R$ ${formatBRL(e.bruto)}</td>
             <td class="p-3 text-right">R$ ${formatBRL(e.desconto)}</td>
             <td class="p-3 text-right font-extrabold">R$ ${formatBRL(e.liquido)}</td>
             <td class="p-3 text-xs">${periodo}</td>
@@ -4501,12 +4501,15 @@ async function switchTab(tab) {
 
 // (removido duplicado) renderAdminFinance redefinida acima
 
-
 async function confirmPayAndEmail(profileId, opts = {}) {
-    const st = window.__financeState;
-    if (!st || !st.acc || !st.acc[profileId]) return;
+    const entries = window.__financeEntries || [];
+    const entry = entries.find(e => String(e.profile_id) === String(profileId));
 
-    const entry = st.acc[profileId];
+    if (!entry) {
+        console.warn('Financeiro: entry não encontrada', profileId);
+        return;
+    }
+
     const pixUsed = (entry.pix || '').trim();
 
     const btn = document.querySelector(`[data-fin-confirm="${profileId}"]`);
@@ -4518,21 +4521,23 @@ async function confirmPayAndEmail(profileId, opts = {}) {
         // marca reservas como pagas
         try {
             await _supabase
-                .from(st.resTable)
+                .from('reservations')
                 .update({
-                    paid_at: paidAt,
-                    paid_amount: entry.liquido,
-                    paid_pix_key: pixUsed,
-                    paid_reference_days: [...new Set(entry.dias)].sort().join(', ')
-                })
-                .in('id', entry.reservaIds);
+    paid: true,
+    paid_at: paidAt,
+    paid_amount: entry.liquido,
+    paid_pix_key: pixUsed,
+    paid_reference_days: [...new Set(entry.dias)].sort().join(', ')
+})
+                .in('id', entry.reservaIds.map(r => r.id));
         } catch (e) {
             console.warn('Falha ao marcar pago:', e);
             throw e;
         }
-
-        // remove da lista local imediatamente para não confirmar de novo
-        delete st.acc[profileId];
+        entry.reservaIds.forEach(r => {
+    r.paid = true;
+    r.paid_at = paidAt;
+});
 
         try {
             const valorFmt = Number(entry.liquido || 0).toFixed(2).replace('.', ',');
