@@ -1271,8 +1271,8 @@ const isPaid = (r) => {
     if (!confirm(`Confirmar pagamento de ${pendentes.length} autônomo(s) visíveis?`)) return;
 
     for (const e of pendentes) {
-      await confirmarPagamentoLote(e.manager_id, { silent: true });
-    }
+  await confirmPayAndEmail(e.profile_id, { silent: true });
+}
     await renderAdminFinance();
   };
 
@@ -1284,94 +1284,6 @@ const isPaid = (r) => {
   document.getElementById('finance-end').addEventListener('change', () => applyFilters());
   document.getElementById('finance-status').addEventListener('change', () => applyFilters());
 }
-
-// Confirma pagamento em lote para um autônomo, sem pedir chave PIX.
-// Confirma apenas as reservas pendentes dentro do filtro atual.
-async function confirmarPagamentoLote(profileId, opts={}) {
-  const filters = window.__financeFilters || { start:'', end:'', status:'pendente' };
-
-  // Recarrega dados para pegar os IDs pendentes e valores (usa cache se existir)
-  const entries = window.__financeEntries || [];
-  const entry = entries.find(e => String(e.manager_id) === String(profileId));
-  if (!entry) return;
-
-  const pendentes = entry.reservaIds.filter(x => !x.paid);
-  if (!pendentes.length) return;
-
-  if (!opts.silent) {
-    if (!confirm(`Confirmar pagamento de ${entry.name} no valor líquido de R$ ${(entry.liquido||0).toFixed(2).replace('.', ',')}?`)) return;
-  }
-
-  const paidAt = new Date().toISOString();
-  const refStart = filters.start || entry.periodoMin || '';
-  const refEnd = filters.end || entry.periodoMax || '';
-  const refDays = `${refStart} até ${refEnd}`;
-
-  // Busca PIX/email atual do perfil
-  const { data: prof } = await _supabase.from('profiles').select('pix_key, email, full_name').eq('id', profileId).maybeSingle();
-  const pixKey = prof?.pix_key || entry.pix || '';
-  const toEmail = prof?.email || entry.email || '';
-  const toName = prof?.full_name || entry.name || 'Autônomo';
-
-  // Atualiza reserva por reserva para gravar paid_amount corretamente
-  for (const r of pendentes) {
-    const payload = {
-      paid: true,
-      paid_at: paidAt,
-      paid_pix_key: pixKey,
-      paid_reference_days: refDays,
-      paid_amount: Number(r.net || 0)
-    };
-    const { error } = await _supabase.from('reservations').update(payload).eq('id', r.id);
-    if (error) {
-      console.warn('Falha ao confirmar reserva', r.id, error);
-    }
-  }
-  // Atualiza cache local para refletir imediatamente na UI
-  for (const r of pendentes) {
-    const local = entry.reservaIds.find(x => String(x.id) === String(r.id));
-    if (local) {
-      local.paid = true;
-      local.paid_at = paidAt;
-    }
-  }
-
-
-  // Envia email (não bloqueia)
-  try {
-    if (window.emailjs && toEmail) {
-      const assunto_texto = 'Pagamento realizado';
-      const status_rotulo = 'Pagamento confirmado';
-      const mensagem_corpo =
-        `Olá ${toName},\n\n` +
-        `Pagamento confirmado no valor de R$ ${Number(entry.liquido||0).toFixed(2).replace('.', ',')}\n` +
-        `Chave PIX: ${pixKey || 'não informada'}\n` +
-        `Data: ${new Date().toLocaleString('pt-BR')}\n` +
-        `Referente ao período: ${refDays}\n\n` +
-        `Obrigado.`;
-
-      await emailjs.send('service_277hapn', 'template_gxhs8bv', {
-        to_email: toEmail,
-        to_name: toName,
-        assunto_texto,
-        status_rotulo,
-        mensagem_corpo
-      });
-    }
-  } catch (e) {
-    console.warn('Falha ao enviar e-mail de pagamento:', e);
-  }
-
-  // Recarrega o financeiro para atualizar totais e filtros (pago/pendente)
-  if (!opts.silent) {
-    try {
-      await renderAdminFinance();
-    } catch (e) {
-      console.warn('Falha ao atualizar financeiro após confirmação:', e);
-    }
-  }
-}
-
 
 async function confirmarPagamento(idsString) {
     if (!confirm("Confirmar que o PIX foi realizado? Isso enviará o registro para o histórico do autônomo.")) return;
