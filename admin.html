@@ -4432,25 +4432,17 @@ async function confirmPayAndEmail(profileId, opts = {}) {
 
         // marca reservas como pagas
         try {
-    const { data, error } = await _supabase.functions.invoke('confirm-payment', {
-        body: {
-            reservation_ids: entry.reservaIds.map(r => r.id),
-            paid_amount: entry.liquido,
-            paid_pix_key: pixUsed,
-            paid_reference_days: `${entry.periodoMin || ''} até ${entry.periodoMax || ''}`
-        }
+    const data = await callEdgeFunction('confirm-payment', {
+        reservation_ids: entry.reservaIds.map(r => r.id),
+        paid_amount: entry.liquido,
+        paid_pix_key: pixUsed,
+        paid_reference_days: `${entry.periodoMin || ''} até ${entry.periodoMax || ''}`
     });
-
-    if (error) {
-        console.error('Falha ao confirmar pagamento:', error);
-        alert('Erro ao confirmar pagamento: ' + (error.message || JSON.stringify(error)));
-        return;
-    }
 
     console.log('RETORNO confirm-payment:', data);
 } catch (e) {
-    console.error('Falha ao chamar confirm-payment:', e);
-    alert('Erro ao chamar confirm-payment: ' + (e?.message || e));
+    console.error('Falha ao confirmar pagamento:', e);
+    alert('Erro ao confirmar pagamento: ' + (e?.message || e));
     return;
 }
 
