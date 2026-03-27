@@ -4466,22 +4466,17 @@ async function confirmPayAndEmail(profileId, opts = {}) {
     console.log('RETORNO send-push PAGAMENTO:', { pushData, pushError });
 
     if (pushError) {
-        console.error('Push retornou erro:', pushError);
-        if (!opts.silent) {
-            alert('Push falhou, mas o pagamento foi confirmado.');
-        }
-    }
+    console.error('Push retornou erro:', pushError);
+}
 } catch (e) {
     console.error('Falha ao enviar push de pagamento:', e);
-    if (!opts.silent) {
-        alert('Push falhou, mas o pagamento foi confirmado.');
-    }
 }
 
-        if (!opts.silent) {
-            alert('Pagamento confirmado.');
-            await renderAdminFinance();
-        }
+        await renderAdminFinance();
+
+if (!opts.silent) {
+    alert('Pagamento confirmado.');
+}
     });
 }
 
