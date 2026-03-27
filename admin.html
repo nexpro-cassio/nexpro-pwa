@@ -4413,6 +4413,13 @@ async function switchTab(tab) {
 
 // (removido duplicado) renderAdminFinance redefinida acima
 
+function formatDateBR(dateStr) {
+    if (!dateStr) return '';
+    const [year, month, day] = String(dateStr).split('-');
+    if (!year || !month || !day) return dateStr;
+    return `${day}/${month}/${year}`;
+}
+
 async function confirmPayAndEmail(profileId, opts = {}) {
     const entries = window.__financeEntries || [];
     const entry = entries.find(e => String(e.profile_id) === String(profileId));
@@ -4423,6 +4430,10 @@ async function confirmPayAndEmail(profileId, opts = {}) {
     }
 
     const pixUsed = (entry.pix || '').trim();
+
+    const inicioBR = formatDateBR(entry.periodoMin);
+    const fimBR = formatDateBR(entry.periodoMax);
+    const periodo = inicioBR === fimBR ? inicioBR : `${inicioBR} até ${fimBR}`;
 
     const btn = document.querySelector(`[data-fin-confirm="${profileId}"]`);
     const lockKey = `finance-confirm-${profileId}`;
@@ -4459,7 +4470,7 @@ async function confirmPayAndEmail(profileId, opts = {}) {
         body: {
             user_id: profileId,
             title: 'Pagamento confirmado 💰',
-            body: `Seu pagamento de R$ ${valorFmt} foi enviado para o PIX ${pixFmt}.`
+            body: `💰 Pagamento enviado!\nValor: R$ ${valorFmt}\nPeríodo: ${periodo}\nPIX: ${pixFmt}`
         }
     });
 
