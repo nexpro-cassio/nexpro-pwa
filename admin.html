@@ -4432,21 +4432,28 @@ async function confirmPayAndEmail(profileId, opts = {}) {
 
         // marca reservas como pagas
         try {
-            await _supabase
-                .from('reservations')
-                .update({
-    paid: true,
-    paid_at: paidAt,
-    paid_amount: entry.liquido,
-    paid_pix_key: pixUsed,
-    paid_reference_days: `${entry.periodoMin || ''} até ${entry.periodoMax || ''}`
-})
-                .in('id', entry.reservaIds.map(r => r.id));
-        } catch (e) {
-    console.error('Falha ao marcar pago:', e);
-    alert('Erro ao marcar pagamento: ' + (e?.message || e));
+    const { data, error } = await _supabase.functions.invoke('confirm-payment', {
+        body: {
+            reservation_ids: entry.reservaIds.map(r => r.id),
+            paid_amount: entry.liquido,
+            paid_pix_key: pixUsed,
+            paid_reference_days: `${entry.periodoMin || ''} até ${entry.periodoMax || ''}`
+        }
+    });
+
+    if (error) {
+        console.error('Falha ao confirmar pagamento:', error);
+        alert('Erro ao confirmar pagamento: ' + (error.message || JSON.stringify(error)));
+        return;
+    }
+
+    console.log('RETORNO confirm-payment:', data);
+} catch (e) {
+    console.error('Falha ao chamar confirm-payment:', e);
+    alert('Erro ao chamar confirm-payment: ' + (e?.message || e));
     return;
 }
+
         entry.reservaIds.forEach(r => {
     r.paid = true;
     r.paid_at = paidAt;
