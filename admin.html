@@ -4470,7 +4470,7 @@ async function confirmPayAndEmail(profileId, opts = {}) {
         body: {
             user_id: profileId,
             title: 'Pagamento confirmado 💰',
-            body: `💰 Pagamento enviado!\nValor: R$ ${valorFmt}\nPeríodo: ${periodo}\nPIX: ${pixFmt}`
+            body: `Valor: R$ ${valorFmt}\nPeríodo: ${periodo}\nChave PIX: ${pixFmt}`
         }
     });
 
