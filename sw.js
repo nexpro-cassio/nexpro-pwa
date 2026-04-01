@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexpro-v29';
+const CACHE_NAME = 'nexpro-v30';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -11,9 +11,23 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
-  );
+
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+
+    for (const asset of STATIC_ASSETS) {
+      try {
+        const response = await fetch(asset, { cache: 'no-store' });
+        if (response && response.ok) {
+          await cache.put(asset, response.clone());
+        } else {
+          console.warn('SW install: arquivo ignorado no cache inicial:', asset);
+        }
+      } catch (err) {
+        console.warn('SW install: falha ao cachear:', asset, err);
+      }
+    }
+  })());
 });
 
 self.addEventListener('activate', event => {

@@ -727,17 +727,40 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       );
     }
 
-    await withTimeout(
-      navigator.serviceWorker.ready,
-      10000,
-      'O Service Worker não ficou pronto a tempo.'
-    );
+    registration = await withTimeout(
+  navigator.serviceWorker.getRegistration('/sw.js'),
+  8000,
+  'O Service Worker demorou demais para responder.'
+);
 
-    registration = await navigator.serviceWorker.getRegistration('/sw.js');
+if (!registration) {
+  throw new Error('O Service Worker não foi encontrado após o registro.');
+}
 
-    if (!registration || !registration.active) {
-      throw new Error('O Service Worker não ficou ativo.');
-    }
+const sw = registration.active || registration.waiting || registration.installing;
+
+if (!sw) {
+  throw new Error('O Service Worker não foi inicializado.');
+}
+
+if (sw.state !== 'activated') {
+  await withTimeout(
+    new Promise((resolve, reject) => {
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'activated') resolve();
+      });
+      setTimeout(() => reject(new Error('O Service Worker não ficou ativo.')), 8000);
+    }),
+    9000,
+    'O Service Worker não ficou ativo.'
+  );
+}
+
+registration = await navigator.serviceWorker.getRegistration('/sw.js');
+
+if (!registration || !registration.active) {
+  throw new Error('O Service Worker não ficou ativo.');
+}
 
     let subscription = await withTimeout(
       registration.pushManager.getSubscription(),
