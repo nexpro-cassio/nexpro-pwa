@@ -766,15 +766,16 @@ enableNotificationsBtn?.addEventListener('click', async () => {
     }
 
   } catch (error) {
-    console.error('Erro ao ativar notificações:', error);
+  console.error('Erro ao ativar notificações:', error);
 
-    if (pwaModalText) {
-      pwaModalText.textContent = 'Não foi possível ativar as notificações agora. Tente novamente.';
-    }
-
-    enableNotificationsBtn.disabled = false;
-    enableNotificationsBtn.textContent = originalBtnText;
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+  if (pwaModalText) {
+    pwaModalText.textContent = error?.message || 'Não foi possível ativar as notificações agora.';
   }
+
+  enableNotificationsBtn.disabled = false;
+  enableNotificationsBtn.textContent = 'Tentar novamente';
+}
 });
 
 function showInstallOnlyModal() {
@@ -1621,6 +1622,10 @@ async function savePushSubscription(subscription) {
   const user = userData.user;
   const json = subscription.toJSON();
 
+  if (!json?.endpoint) {
+    throw new Error('Subscription criada sem endpoint.');
+  }
+
   const payload = {
     user_id: user.id,
     endpoint: json.endpoint,
@@ -1636,19 +1641,24 @@ async function savePushSubscription(subscription) {
     .eq('endpoint', payload.endpoint)
     .maybeSingle();
 
-  if (existingError) throw existingError;
+  if (existingError) {
+    throw new Error('Erro ao consultar subscription: ' + existingError.message);
+  }
 
   if (!existing) {
     const { error: insertError } = await _supabase
       .from('push_subscriptions')
       .insert([payload]);
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      throw new Error('Erro ao inserir subscription: ' + insertError.message);
+    }
+
     return;
   }
 
   if (existing.user_id !== user.id) {
-    throw new Error('Este aparelho já está vinculado a outro usuário de teste. Apague a subscription antiga no banco.');
+    throw new Error('Este aparelho já está vinculado a outro usuário.');
   }
 
   const { error: updateError } = await _supabase
@@ -1656,7 +1666,9 @@ async function savePushSubscription(subscription) {
     .update(payload)
     .eq('endpoint', payload.endpoint);
 
-  if (updateError) throw updateError;
+  if (updateError) {
+    throw new Error('Erro ao atualizar subscription: ' + updateError.message);
+  }
 }
 
 </script>
