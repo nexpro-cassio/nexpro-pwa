@@ -667,6 +667,14 @@ function showPwaModal() {
 enableNotificationsBtn?.addEventListener('click', async () => {
   const originalBtnText = 'Ativar notificações';
 
+  const withTimeout = (promise, ms, message) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(message)), ms)
+      )
+    ]);
+
   try {
     enableNotificationsBtn.disabled = true;
     enableNotificationsBtn.textContent = 'Ativando...';
@@ -680,102 +688,79 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       window.navigator.standalone === true;
 
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      if (pwaModalText) {
-        pwaModalText.textContent = 'Este dispositivo não suporta notificações neste modo.';
-      }
-      enableNotificationsBtn.disabled = false;
-      enableNotificationsBtn.textContent = originalBtnText;
-      return;
+      throw new Error('Este dispositivo não suporta notificações neste modo.');
     }
 
     if (isIos && !isStandalone) {
-      if (pwaModalText) {
-        pwaModalText.textContent = 'No iPhone, primeiro instale o app na Tela de Início e abra pelo ícone para ativar as notificações.';
-      }
-      enableNotificationsBtn.disabled = false;
-      enableNotificationsBtn.textContent = originalBtnText;
-      return;
+      throw new Error('No iPhone, primeiro instale o app na Tela de Início e abra pelo ícone para ativar as notificações.');
     }
 
     if (Notification.permission === 'denied') {
-      if (pwaModalText) {
-        pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
-      }
-      enableNotificationsBtn.disabled = false;
-      enableNotificationsBtn.textContent = originalBtnText;
-      return;
+      throw new Error('As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.');
     }
 
-    const permission = await Notification.requestPermission();
+    const permission = await withTimeout(
+      Notification.requestPermission(),
+      10000,
+      'A permissão de notificações demorou demais para responder.'
+    );
 
     if (permission === 'denied') {
-      if (pwaModalText) {
-        pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
-      }
-      enableNotificationsBtn.disabled = false;
-      enableNotificationsBtn.textContent = originalBtnText;
-      return;
+      throw new Error('As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.');
     }
 
     if (permission !== 'granted') {
-      if (pwaModalText) {
-        pwaModalText.textContent = 'Não foi possível ativar as notificações.';
-      }
-      enableNotificationsBtn.disabled = false;
-      enableNotificationsBtn.textContent = originalBtnText;
-      return;
+      throw new Error('Não foi possível ativar as notificações.');
     }
 
-    let registration = await navigator.serviceWorker.getRegistration('/sw.js');
+    let registration = await withTimeout(
+      navigator.serviceWorker.getRegistration('/sw.js'),
+      8000,
+      'O Service Worker demorou demais para responder.'
+    );
 
-if (!registration) {
-  registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-}
-
-await navigator.serviceWorker.ready;
-
-// garante que o SW esteja realmente ativo antes do subscribe
-if (!registration.active) {
-  const sw = registration.installing || registration.waiting || registration.active;
-
-  if (!sw) {
-    if (pwaModalText) {
-      pwaModalText.textContent = 'Não foi possível iniciar o serviço de notificações.';
-    }
-    enableNotificationsBtn.disabled = false;
-    enableNotificationsBtn.textContent = originalBtnText;
-    return;
-  }
-
-  await new Promise((resolve, reject) => {
-    if (sw.state === 'activated') {
-      resolve();
-      return;
+    if (!registration) {
+      registration = await withTimeout(
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }),
+        8000,
+        'Não foi possível registrar o Service Worker.'
+      );
     }
 
-    const timeout = setTimeout(() => {
-      reject(new Error('Service Worker não ativou a tempo.'));
-    }, 8000);
+    await withTimeout(
+      navigator.serviceWorker.ready,
+      10000,
+      'O Service Worker não ficou pronto a tempo.'
+    );
 
-    sw.addEventListener('statechange', () => {
-      if (sw.state === 'activated') {
-        clearTimeout(timeout);
-        resolve();
-      }
-    });
-  });
-}
+    registration = await navigator.serviceWorker.getRegistration('/sw.js');
 
-let subscription = await registration.pushManager.getSubscription();
+    if (!registration || !registration.active) {
+      throw new Error('O Service Worker não ficou ativo.');
+    }
 
-if (!subscription) {
-  subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array('BBJ1NfRn7E1xtmeAfvMJFssme9lGTQtce9a23yIehJ2PDlW8fOZl52GYQwld5EcQqd9sP8t_X0Ko0OVj9x5qv5k')
-  });
-}
+    let subscription = await withTimeout(
+      registration.pushManager.getSubscription(),
+      8000,
+      'A verificação de assinatura push demorou demais.'
+    );
 
-    await savePushSubscription(subscription);
+    if (!subscription) {
+      subscription = await withTimeout(
+        registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array('BBJ1NfRn7E1xtmeAfvMJFssme9lGTQtce9a23yIehJ2PDlW8fOZl52GYQwld5EcQqd9sP8t_X0Ko0OVj9x5qv5k')
+        }),
+        10000,
+        'A criação da assinatura push demorou demais.'
+      );
+    }
+
+    await withTimeout(
+      savePushSubscription(subscription),
+      10000,
+      'O salvamento da assinatura no banco demorou demais.'
+    );
 
     localStorage.setItem('pushEnabled', 'true');
     hidePwaModal();
@@ -791,16 +776,16 @@ if (!subscription) {
     }
 
   } catch (error) {
-  console.error('Erro ao ativar notificações:', error);
+    console.error('Erro ao ativar notificações:', error);
 
-  if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
-  if (pwaModalText) {
-    pwaModalText.textContent = error?.message || 'Não foi possível ativar as notificações agora.';
+    if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+    if (pwaModalText) {
+      pwaModalText.textContent = error?.message || 'Não foi possível ativar as notificações agora.';
+    }
+  } finally {
+    enableNotificationsBtn.disabled = false;
+    enableNotificationsBtn.textContent = originalBtnText;
   }
-
-  enableNotificationsBtn.disabled = false;
-  enableNotificationsBtn.textContent = 'Tentar novamente';
-}
 });
 
 function showInstallOnlyModal() {
