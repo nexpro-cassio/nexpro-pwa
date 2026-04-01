@@ -726,29 +726,54 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       return;
     }
 
-    let registration = await navigator.serviceWorker.getRegistration();
+    let registration = await navigator.serviceWorker.getRegistration('/sw.js');
 
-    if (!registration) {
-      registration = await navigator.serviceWorker.register('/sw.js');
+if (!registration) {
+  registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+}
+
+await navigator.serviceWorker.ready;
+
+// garante que o SW esteja realmente ativo antes do subscribe
+if (!registration.active) {
+  const sw = registration.installing || registration.waiting || registration.active;
+
+  if (!sw) {
+    if (pwaModalText) {
+      pwaModalText.textContent = 'Não foi possível iniciar o serviço de notificações.';
     }
+    enableNotificationsBtn.disabled = false;
+    enableNotificationsBtn.textContent = originalBtnText;
+    return;
+  }
 
-    if (!registration) {
-      if (pwaModalText) {
-        pwaModalText.textContent = 'Não foi possível iniciar o serviço de notificações.';
-      }
-      enableNotificationsBtn.disabled = false;
-      enableNotificationsBtn.textContent = originalBtnText;
+  await new Promise((resolve, reject) => {
+    if (sw.state === 'activated') {
+      resolve();
       return;
     }
 
-    let subscription = await registration.pushManager.getSubscription();
+    const timeout = setTimeout(() => {
+      reject(new Error('Service Worker não ativou a tempo.'));
+    }, 8000);
 
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array('BBJ1NfRn7E1xtmeAfvMJFssme9lGTQtce9a23yIehJ2PDlW8fOZl52GYQwld5EcQqd9sP8t_X0Ko0OVj9x5qv5k')
-      });
-    }
+    sw.addEventListener('statechange', () => {
+      if (sw.state === 'activated') {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+  });
+}
+
+let subscription = await registration.pushManager.getSubscription();
+
+if (!subscription) {
+  subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array('BBJ1NfRn7E1xtmeAfvMJFssme9lGTQtce9a23yIehJ2PDlW8fOZl52GYQwld5EcQqd9sP8t_X0Ko0OVj9x5qv5k')
+  });
+}
 
     await savePushSubscription(subscription);
 
