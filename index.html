@@ -696,10 +696,15 @@ enableNotificationsBtn?.addEventListener('click', async () => {
 
     alert('permission=' + permission);
 
-    if (permission !== 'granted') {
-      alert('Permissão de notificações não concedida.');
-      return;
-    }
+    if (permission === 'denied') {
+  alert('Você bloqueou as notificações.\n\nVá em:\nAjustes > Notificações > Nexpro\nE ative manualmente.');
+  return;
+}
+
+if (permission !== 'granted') {
+  alert('Permissão de notificações não concedida.');
+  return;
+}
 
     alert('Antes do serviceWorker.ready');
 
