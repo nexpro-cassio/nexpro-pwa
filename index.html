@@ -583,6 +583,13 @@ if (data.session) {
 setTimeout(() => {
   const alreadyClosed = localStorage.getItem('pwaModalClosed');
 
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+  // 👇 SE JÁ ESTÁ INSTALADO → NÃO MOSTRA NADA
+  if (isStandalone) return;
+
   if (!alreadyClosed) {
     showInstallOnlyModal();
   }
