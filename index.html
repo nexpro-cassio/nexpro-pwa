@@ -584,7 +584,7 @@ setTimeout(() => {
   const alreadyClosed = localStorage.getItem('pwaModalClosed');
 
   if (!alreadyClosed) {
-    showPwaModal();
+    showInstallOnlyModal();
   }
 }, 800);
 
@@ -720,6 +720,38 @@ if (role === 'admin') {
   }
 });
 
+function showInstallOnlyModal() {
+  if (!pwaModal) return;
+
+  pwaModal.classList.remove('hidden');
+
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Instale o app Nexpro';
+  if (pwaModalText) {
+    pwaModalText.textContent = 'Instale o app para usar sem barra do navegador e receber notificações.';
+  }
+
+  enableNotificationsBtn.classList.add('hidden');
+
+  const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+  if (isIos) {
+    installPwaBtn.classList.add('hidden');
+    iosInstallHint.classList.remove('hidden');
+    return;
+  }
+
+  iosInstallHint.classList.add('hidden');
+
+  if (!isStandalone && deferredPrompt) {
+    installPwaBtn.classList.remove('hidden');
+  } else {
+    installPwaBtn.classList.add('hidden');
+  }
+}
+
 installPwaBtn?.addEventListener('click', async () => {
   try {
     if (!deferredPrompt) {
@@ -738,6 +770,7 @@ installPwaBtn?.addEventListener('click', async () => {
 });
 
 closePwaModal?.addEventListener('click', () => {
+  localStorage.setItem('pwaModalClosed', 'true');
   hidePwaModal();
 });
 
