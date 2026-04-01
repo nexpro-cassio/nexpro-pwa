@@ -8,37 +8,93 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0f172a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Nexpro">
-<link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Nexpro">
+  <link rel="apple-touch-icon" href="/icon-192.png">
 </head>
-<body class="min-h-screen bg-slate-100">
-  <div class="max-w-7xl mx-auto p-6">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-black text-slate-900 uppercase tracking-tight">Painel do Gerente</h1>
-        <p id="mgr-subtitle" class="text-sm text-slate-500">Carregando...</p>
+<body class="h-screen flex overflow-hidden bg-gray-100">
+  <style>
+    .module-container { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+    .subtab-btn {
+      display:flex; align-items:center; gap:8px; padding:10px 20px;
+      border:1px solid #e5e7eb; border-radius:8px; background:white;
+      font-size:12px; font-weight:800; color:#6b7280; text-transform:uppercase;
+    }
+    .subtab-btn.active { background:#10b981; color:white; border-color:#10b981; }
+  </style>
+
+  <aside class="w-64 bg-gray-900 text-white flex flex-col shrink-0">
+    <div class="p-6 text-xl font-bold border-b border-gray-800 text-emerald-400">NEXO GERENTE</div>
+    <nav class="flex-1 p-4 space-y-2">
+      <button class="nav-btn w-full text-left px-4 py-3 rounded bg-gray-800 text-emerald-400 border-l-4 border-emerald-400 font-bold" data-tab="reservas">📋 Reservas do dia</button>
+      <button class="nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent" data-tab="atribuir">📦 Atribuir pedidos</button>
+      <button class="nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent" data-tab="pedidos">🧾 Pedidos</button>
+      <button id="btn-logout" class="w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent">🚪 Sair</button>
+    </nav>
+  </aside>
+
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <div class="module-container bg-gray-50">
+      <header class="bg-white border-b shrink-0">
+        <div class="h-16 flex items-center px-8 justify-between">
+          <div>
+            <h2 class="text-xl font-semibold text-gray-800">Gestão Operacional</h2>
+            <p id="mgr-subtitle" class="text-xs text-gray-500">Carregando...</p>
+          </div>
+          <div class="flex gap-2">
+            <button id="btn-refresh" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-bold hover:bg-gray-300">Atualizar</button>
+          </div>
+        </div>
+
+        <div class="px-8 pb-4">
+          <div class="bg-gray-50 border rounded-2xl p-4">
+            <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+              <div class="flex-1 min-w-0">
+                <label class="text-[11px] font-black uppercase text-slate-500">Filtro geral de lojas</label>
+                <div class="relative mt-1" id="global-store-filter-wrap">
+                  <button id="global-store-filter-btn" type="button" class="w-full border rounded-xl bg-white px-4 py-3 text-left text-sm flex items-center justify-between gap-3">
+                    <span id="global-store-filter-label" class="truncate text-slate-700">Todas as minhas lojas</span>
+                    <span class="text-slate-400 text-xs font-bold">▼</span>
+                  </button>
+
+                  <div id="global-store-filter-panel" class="hidden absolute z-30 mt-2 w-full rounded-2xl border bg-white shadow-xl p-3">
+                    <input id="global-store-filter-search" type="text" placeholder="Digite o nome da loja..." class="w-full border rounded-xl px-3 py-2 text-sm mb-3">
+
+                    <label class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 border-b mb-2">
+                      <input id="global-store-all" type="checkbox" class="scale-110">
+                      <span class="text-sm font-black text-slate-800">Todas</span>
+                    </label>
+
+                    <div id="global-store-options" class="max-h-64 overflow-auto space-y-1"></div>
+
+                    <div class="flex gap-2 mt-3 pt-3 border-t">
+                      <button id="global-store-apply" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs py-3 rounded-xl">Aplicar</button>
+                      <button id="global-store-close" type="button" class="px-4 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black uppercase text-xs py-3 rounded-xl">Fechar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="lg:w-auto">
+                <button id="global-store-clear" type="button" class="w-full lg:w-auto px-4 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-black uppercase text-xs">Limpar filtro geral</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="px-8 py-6 flex gap-3 overflow-x-auto shrink-0 bg-white border-b">
+        <button class="tab-btn subtab-btn active" data-tab="reservas">📋 Reservas do dia</button>
+        <button class="tab-btn subtab-btn" data-tab="atribuir">📦 Atribuir pedidos</button>
+        <button class="tab-btn subtab-btn" data-tab="pedidos">🧾 Pedidos</button>
       </div>
-      <div class="flex gap-2">
-        <button id="btn-refresh" class="px-4 py-2 rounded-xl border bg-white font-black text-xs uppercase">Atualizar</button>
-        <button id="btn-logout" class="px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-xs uppercase">Sair</button>
-      </div>
+
+      <div id="view" class="flex-1 overflow-y-auto p-8"></div>
     </div>
+  </main>
 
-    <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
-      <div class="flex gap-2 p-3 border-b bg-slate-50">
-        <button class="tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-900 text-white" data-tab="reservas">Reservas do dia</button>
-        <button class="tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase border bg-white" data-tab="atribuir">Atribuir pedidos</button>
-        <button class="tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase border bg-white" data-tab="pedidos">Pedidos</button>
-      </div>
-
-      <div id="view" class="p-6"></div>
-    </div>
-  </div>
-
-  <!-- Modal código -->
   <div id="codeModal" class="fixed inset-0 hidden items-center justify-center bg-black/60 p-4">
     <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
       <h3 id="codeTitle" class="text-lg font-black uppercase text-slate-900 mb-2">Código</h3>
@@ -62,7 +118,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const codeTitle = document.getElementById('codeTitle');
   const codeValue = document.getElementById('codeValue');
   const codeExpires = document.getElementById('codeExpires');
-  document.getElementById('closeCodeModal').onclick = () => codeModal.classList.add('hidden');
+  document.getElementById('closeCodeModal').onclick = () => {
+    codeModal.classList.add('hidden');
+    codeModal.classList.remove('flex');
+  };
 
   const todayISO = () => {
     const d = new Date();
@@ -72,24 +131,171 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  let session = null;
+  let me = null;
+  let access = [];
+  let storeIds = [];
+  let currentTab = 'reservas';
+  let perms = { can_assign_orders:false, can_generate_checkin_code:false, can_generate_checkout_code:false };
+  let currentResFilter = 'all';
+  let selectedGlobalStoreIds = [];
+
+  function activeStoreIds(){
+    return (selectedGlobalStoreIds && selectedGlobalStoreIds.length)
+      ? selectedGlobalStoreIds.slice()
+      : storeIds.slice();
+  }
+
   function setActiveTab(tab){
+    currentTab = tab;
+
     document.querySelectorAll('.tab-btn').forEach(b => {
       if (b.dataset.tab === tab) {
-        b.className = "tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-900 text-white";
+        b.className = 'tab-btn subtab-btn active';
       } else {
-        b.className = "tab-btn px-4 py-2 rounded-xl font-black text-xs uppercase border bg-white";
+        b.className = 'tab-btn subtab-btn';
+      }
+    });
+
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      if (b.dataset.tab === tab) {
+        b.className = 'nav-btn w-full text-left px-4 py-3 rounded bg-gray-800 text-emerald-400 border-l-4 border-emerald-400 font-bold';
+      } else {
+        b.className = 'nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent';
       }
     });
   }
 
-  let session = null;
-  let me = null;
-  let access = []; // manager_store_access
-  let storeIds = [];
-  let perms = { can_assign_orders:false, can_generate_checkin_code:false, can_generate_checkout_code:false };
+  function parseTime(dateISO, hhmm){
+    if (!dateISO || !hhmm) return null;
+    const [h,m] = String(hhmm).split(':');
+    return new Date(`${dateISO}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+  }
 
-  // filtro atual da aba Reservas
-  let currentResFilter = 'all';
+  function normStatus(s){
+    const v = (s || '').toString().toLowerCase().trim();
+    if (['em_andamento','em andamento','check-in','checkin','checking','check-in ativo','check_in'].includes(v)) return 'present';
+    if (['pausa','pause','paused'].includes(v)) return 'paused';
+    if (['confirmada','confirmado','confirmed','confirm'].includes(v)) return 'to_arrive';
+    if (['check-out','checkout','checked_out','check_out','finalizado','finalizada','completed','done'].includes(v)) return 'done';
+    return v;
+  }
+
+  function nameOf(p){
+    return p?.full_name || p?.fullname || p?.fullName || p?.email || 'Autônomo';
+  }
+
+  function escapeHtml(v){
+    return String(v ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  function refreshGlobalStoreLabel(){
+    const label = document.getElementById('global-store-filter-label');
+    const total = storeIds.length;
+    const active = activeStoreIds();
+
+    if (!total || active.length === total) {
+      label.textContent = 'Todas as minhas lojas';
+      return;
+    }
+
+    const names = access
+      .filter(a => active.includes(a.store_id))
+      .map(a => a.stores?.name)
+      .filter(Boolean);
+
+    label.textContent = names.length ? names.join(', ') : 'Filtro geral aplicado';
+  }
+
+  function renderGlobalStoreOptions(searchTerm = ''){
+    const host = document.getElementById('global-store-options');
+    const allBox = document.getElementById('global-store-all');
+    const active = activeStoreIds();
+    const q = (searchTerm || '').trim().toLowerCase();
+
+    const filtered = access.filter(a => {
+      const nm = (a.stores?.name || '').toLowerCase();
+      return !q || nm.includes(q);
+    });
+
+    host.innerHTML = filtered.map(a => {
+      const checked = active.includes(a.store_id) ? 'checked' : '';
+      return `
+        <label class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50">
+          <input type="checkbox" class="global-store-item scale-110" value="${a.store_id}" ${checked}>
+          <span class="text-sm text-slate-800">${escapeHtml(a.stores?.name || 'Loja')}</span>
+        </label>
+      `;
+    }).join('') || '<div class="text-sm text-slate-500 italic px-2 py-3">Nenhuma loja encontrada.</div>';
+
+    allBox.checked = active.length === storeIds.length;
+  }
+
+  function openGlobalStorePanel(){
+    document.getElementById('global-store-filter-panel').classList.remove('hidden');
+    renderGlobalStoreOptions(document.getElementById('global-store-filter-search').value || '');
+  }
+
+  function closeGlobalStorePanel(){
+    document.getElementById('global-store-filter-panel').classList.add('hidden');
+  }
+
+  async function rerenderCurrentTab(){
+    if (currentTab === 'reservas') return renderReservas();
+    if (currentTab === 'atribuir') return renderAtribuir();
+    if (currentTab === 'pedidos') return renderPedidos();
+    return renderReservas();
+  }
+
+  function setupGlobalStoreFilter(){
+    refreshGlobalStoreLabel();
+    renderGlobalStoreOptions('');
+
+    const wrap = document.getElementById('global-store-filter-wrap');
+    const btn = document.getElementById('global-store-filter-btn');
+    const panel = document.getElementById('global-store-filter-panel');
+    const search = document.getElementById('global-store-filter-search');
+    const allBox = document.getElementById('global-store-all');
+
+    btn.onclick = () => {
+      if (panel.classList.contains('hidden')) openGlobalStorePanel();
+      else closeGlobalStorePanel();
+    };
+
+    document.getElementById('global-store-close').onclick = closeGlobalStorePanel;
+
+    search.oninput = () => renderGlobalStoreOptions(search.value || '');
+
+    allBox.onchange = () => {
+      const checks = Array.from(document.querySelectorAll('.global-store-item'));
+      checks.forEach(c => { c.checked = allBox.checked; });
+    };
+
+    document.getElementById('global-store-apply').onclick = async () => {
+      const checked = Array.from(document.querySelectorAll('.global-store-item:checked')).map(x => x.value);
+      selectedGlobalStoreIds = checked.length ? checked : [];
+      refreshGlobalStoreLabel();
+      closeGlobalStorePanel();
+      await rerenderCurrentTab();
+    };
+
+    document.getElementById('global-store-clear').onclick = async () => {
+      selectedGlobalStoreIds = [];
+      search.value = '';
+      refreshGlobalStoreLabel();
+      renderGlobalStoreOptions('');
+      await rerenderCurrentTab();
+    };
+
+    document.addEventListener('click', (ev) => {
+      if (!wrap.contains(ev.target)) closeGlobalStorePanel();
+    });
+  }
 
   async function boot(){
     const out = await sb.auth.getSession();
@@ -97,8 +303,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!session) return window.location.href = '/index.html';
     me = session.user;
 
-    // Compatibilidade: algumas bases usam manager_profiles.manager_id (mesmo UUID do auth user)
-    // e outras usam id. Tentamos primeiro manager_id e, se não existir, fazemos fallback para id.
     let mp = null;
     let mpErr = null;
 
@@ -131,9 +335,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       alert('Erro ao carregar acessos: ' + accErr.message);
       return;
     }
+
     access = acc || [];
     storeIds = access.map(a => a.store_id);
-    // Permissões: OR entre lojas (se qualquer loja liberar, habilita o botão)
+
     perms.can_assign_orders = access.some(a => a.can_assign_orders);
     perms.can_generate_checkin_code = access.some(a => a.can_generate_checkin_code);
     perms.can_generate_checkout_code = access.some(a => a.can_generate_checkout_code);
@@ -141,19 +346,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lojasTxt = access.map(a => a.stores?.name).filter(Boolean).join(', ');
     subtitle.textContent = `Logado: ${me.email} • Lojas: ${lojasTxt || 'N/A'}`;
 
+    setupGlobalStoreFilter();
     await renderReservas();
   }
 
   async function fetchReservasDoDia(){
     const dia = todayISO();
-    if (!storeIds.length) return [];
+    const scopedStoreIds = activeStoreIds();
+    if (!scopedStoreIds.length) return [];
 
-    // 1) Slots do dia (apenas lojas do gerente)
     const { data: slots, error: slotErr } = await sb
       .from('slots')
       .select('id, store_id, shift_id, date')
       .eq('date', dia)
-      .in('store_id', storeIds);
+      .in('store_id', scopedStoreIds);
 
     if (slotErr) { console.error(slotErr); throw slotErr; }
     const slotList = slots || [];
@@ -162,7 +368,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const slotById = new Map(slotList.map(s => [s.id, s]));
     const slotIds = slotList.map(s => s.id);
 
-    // 2) Shifts (para obter start_time/end_time)
     const shiftIds = [...new Set(slotList.map(s => s.shift_id).filter(Boolean))];
     let shiftById = new Map();
     if (shiftIds.length){
@@ -174,7 +379,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       shiftById = new Map((shifts||[]).map(x => [x.id, x]));
     }
 
-    // 3) Stores
     const storeIdsUniq = [...new Set(slotList.map(s => s.store_id).filter(Boolean))];
     let storeById = new Map();
     if (storeIdsUniq.length){
@@ -186,8 +390,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       storeById = new Map((stores||[]).map(x => [x.id, x]));
     }
 
-    // 4) Reservations do dia
-    // Preferência: slot_id (modelo novo). Fallback: vacancy_id (modelo antigo).
     let reservations = [];
     {
       let { data, error } = await sb
@@ -209,7 +411,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!reservations.length) return [];
 
-    // 5) Profiles
     const profileIds = [...new Set(reservations.map(r => r.profile_id).filter(Boolean))];
     let profById = new Map();
     if (profileIds.length){
@@ -221,7 +422,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       profById = new Map((profs||[]).map(p => [p.id, p]));
     }
 
-    // Enriquecer
     return reservations.map(r => {
       const sid = r.slot_id || r.vacancy_id;
       const slot = slotById.get(sid) || null;
@@ -234,24 +434,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
     });
   }
-
-  function parseTime(dateISO, hhmm){
-    if (!dateISO || !hhmm) return null;
-    const [h,m] = String(hhmm).split(':');
-    const d = new Date(`${dateISO}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
-    return d;
-  }
-
-
-  function normStatus(s){
-    const v = (s || '').toString().toLowerCase().trim();
-    if (['em_andamento','em andamento','check-in','checkin','checking','check-in ativo','check_in'].includes(v)) return 'present';
-    if (['pausa','pause','paused'].includes(v)) return 'paused';
-    if (['confirmada','confirmado','confirmed','confirm'].includes(v)) return 'to_arrive';
-    if (['check-out','checkout','checked_out','check_out','finalizado','finalizada','completed','done'].includes(v)) return 'done';
-    return v;
-  }
-
 
   function kpis(reservas){
     const now = Date.now();
@@ -275,7 +457,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { toArrive, late, paused, present };
   }
 
-  
   function applyResFilter(reservas){
     const now = Date.now();
     const tolMin = 10;
@@ -296,11 +477,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return reservas;
   }
 
-function nameOf(p){
-    return p?.full_name || p?.fullname || p?.fullName || p?.email || 'Autônomo';
-  }
-
-  
   let codeCountdownTimer = null;
 
   function startCodeCountdown(expiresAtIso){
@@ -321,7 +497,6 @@ function nameOf(p){
   }
 
   async function upsertCode(reservationId, codeType){
-    // pega a reserva (para validar permissão e status)
     const reservas = await fetchReservasDoDia();
     const res = reservas.find(x => x.id === reservationId);
     if (!res) throw new Error('Reserva não encontrada.');
@@ -332,17 +507,13 @@ function nameOf(p){
     if (codeType === 'checkout' && !perms.can_generate_checkout_code) {
       throw new Error('Sem permissão para gerar check-out.');
     }
-
-    // regra: retomar só faz sentido quando está em pausa
     if (codeType === 'resume' && normStatus(res.status) !== 'paused') {
       throw new Error('Retomar só está disponível quando a reserva está em PAUSA.');
     }
 
-    // 60 segundos
     const nowMs = Date.now();
     const ttlMs = 60 * 1000;
 
-    // tenta reutilizar código ainda válido (evita erro de unique)
     const { data: existing, error: selErr } = await sb
       .from('reservation_codes')
       .select('id, code, expires_at')
@@ -354,52 +525,39 @@ function nameOf(p){
 
     let code = null;
     let expiresAt = null;
-
     const existingExpMs = existing?.expires_at ? new Date(existing.expires_at).getTime() : 0;
+
     if (existing && existingExpMs > nowMs) {
       code = existing.code;
       expiresAt = existing.expires_at;
     } else {
-      code = String(Math.floor(100000 + Math.random()*900000)); // 6 dígitos
+      code = String(Math.floor(100000 + Math.random()*900000));
       expiresAt = new Date(nowMs + ttlMs).toISOString();
 
       if (existing?.id) {
-        // atualiza o registro existente (resolve o unique constraint)
         const { error: updErr } = await sb
           .from('reservation_codes')
           .update({ code, expires_at: expiresAt, created_by: me.id })
           .eq('id', existing.id);
-
         if (updErr) throw updErr;
       } else {
-        // cria novo registro
         const { error: insErr } = await sb
           .from('reservation_codes')
-          .insert({
-            reservation_id: reservationId,
-            code_type: codeType,
-            code,
-            expires_at: expiresAt,
-            created_by: me.id
-          });
+          .insert({ reservation_id: reservationId, code_type: codeType, code, expires_at: expiresAt, created_by: me.id });
 
         if (insErr) {
-          // corrida: se já existir por constraint, faz update por lookup
           const { data: ex2, error: ex2Err } = await sb
             .from('reservation_codes')
             .select('id')
             .eq('reservation_id', reservationId)
             .eq('code_type', codeType)
             .maybeSingle();
-
           if (ex2Err) throw insErr;
-
           if (ex2?.id) {
             const { error: upd2Err } = await sb
               .from('reservation_codes')
               .update({ code, expires_at: expiresAt, created_by: me.id })
               .eq('id', ex2.id);
-
             if (upd2Err) throw upd2Err;
           } else {
             throw insErr;
@@ -414,29 +572,26 @@ function nameOf(p){
       'Código de RETOMAR PAUSA';
 
     const codeQr = document.getElementById('codeQr');
-    if (codeQr) {
-      codeQr.innerHTML = '';
-      try {
-        new QRCode(codeQr, { text: String(code), width: 220, height: 220 });
-      } catch (e) {}
-    }
+    codeQr.innerHTML = '';
+    try {
+      new QRCode(codeQr, { text: String(code), width: 220, height: 220 });
+    } catch (e) {}
 
     codeValue.textContent = code;
     startCodeCountdown(expiresAt);
-
     codeModal.classList.remove('hidden');
     codeModal.classList.add('flex');
   }
 
   async function renderReservas(){
     setActiveTab('reservas');
+    view.innerHTML = '<div class="text-center text-slate-500 italic p-10">Carregando reservas do dia...</div>';
 
-    view.innerHTML = `<div class="text-center text-slate-500 italic p-10">Carregando reservas do dia...</div>`;
     let reservas = [];
     try {
       reservas = await fetchReservasDoDia();
     } catch(e){
-      return view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${e.message}</div>`;
+      return view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${escapeHtml(e.message)}</div>`;
     }
 
     const { toArrive, late, paused, present } = kpis(reservas);
@@ -471,12 +626,11 @@ function nameOf(p){
     `;
 
     const filtered = applyResFilter(reservas);
-
     const rows = filtered.map(r => {
       const slot = r.slots || {};
-      const loja = (slot.store?.name || slot.stores?.name || 'Loja');
-      const stt = (slot.shift?.start_time || slot.start_time || '??:??');
-      const ett = (slot.shift?.end_time || slot.end_time || '??:??');
+      const loja = slot.store?.name || 'Loja';
+      const stt = slot.shift?.start_time || slot.start_time || '??:??';
+      const ett = slot.shift?.end_time || slot.end_time || '??:??';
       const hora = `${stt} - ${ett}`;
       const nm = nameOf(r.profiles);
       const st = r.status || '-';
@@ -488,12 +642,12 @@ function nameOf(p){
         <div class="p-4 border rounded-2xl mb-3 bg-white">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <div class="flex items-center gap-3">
-                <div class="text-2xl font-black text-slate-900">${hora}</div>
-                <div class="text-sm font-black text-slate-900">${nm}</div>
-                <span class="text-[10px] font-black uppercase px-2 py-1 rounded-full border">${st}</span>
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="text-2xl font-black text-slate-900">${escapeHtml(hora)}</div>
+                <div class="text-sm font-black text-slate-900">${escapeHtml(nm)}</div>
+                <span class="text-[10px] font-black uppercase px-2 py-1 rounded-full border">${escapeHtml(st)}</span>
               </div>
-              <div class="text-xs text-slate-500 mt-1">${loja}</div>
+              <div class="text-xs text-slate-500 mt-1">${escapeHtml(loja)}</div>
             </div>
             <div class="flex flex-wrap gap-2">
               <button class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase ${canCI?'bg-emerald-600 text-white':'bg-slate-200 text-slate-400 cursor-not-allowed'}" data-id="${r.id}" data-type="checkin" ${canCI?'':'disabled'}>Gerar Check-in</button>
@@ -506,30 +660,18 @@ function nameOf(p){
     }).join('');
 
     view.innerHTML = cards + `<div>${rows || '<div class="text-slate-500 italic p-8">Nenhuma reserva hoje.</div>'}</div>`;
-    // eventos de filtro
+
     document.querySelectorAll('.kpi-card').forEach(el => {
-      el.onclick = () => {
-        currentResFilter = el.dataset.filter;
-        renderReservas();
-      };
+      el.onclick = () => { currentResFilter = el.dataset.filter; renderReservas(); };
     });
     document.querySelectorAll('.kpi-all').forEach(el => {
-      el.onclick = () => {
-        currentResFilter = 'all';
-        renderReservas();
-      };
+      el.onclick = () => { currentResFilter = 'all'; renderReservas(); };
     });
-
-
-
     document.querySelectorAll('.btn-code').forEach(b => {
       b.onclick = async () => {
-        try {
-          await upsertCode(b.dataset.id, b.dataset.type);
-        } catch(e){
-          alert(e.message || e);
-        }
-      }
+        try { await upsertCode(b.dataset.id, b.dataset.type); }
+        catch(e){ alert(e.message || e); }
+      };
     });
   }
 
@@ -537,34 +679,26 @@ function nameOf(p){
     setActiveTab('atribuir');
 
     if (!perms.can_assign_orders) {
-      view.innerHTML = `<div class="p-6 rounded-2xl border bg-white text-slate-700">
-        <div class="font-black uppercase mb-2">Sem permissão</div>
-        <p class="text-sm">Você não tem permissão para atribuir pedidos.</p>
-      </div>`;
+      view.innerHTML = `<div class="p-6 rounded-2xl border bg-white text-slate-700"><div class="font-black uppercase mb-2">Sem permissão</div><p class="text-sm">Você não tem permissão para atribuir pedidos.</p></div>`;
       return;
     }
 
-    view.innerHTML = `<div class="text-center text-slate-500 italic p-10">Carregando...</div>`;
+    view.innerHTML = '<div class="text-center text-slate-500 italic p-10">Carregando...</div>';
     let reservas = [];
     try {
       reservas = await fetchReservasDoDia();
     } catch(e){
-      return view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${e.message}</div>`;
+      return view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${escapeHtml(e.message)}</div>`;
     }
 
     const presentes = reservas.filter(r => normStatus(r.status) === 'present');
     const pausados = reservas.filter(r => normStatus(r.status) === 'paused');
 
-        
-    // ===== PAUSA TOTAL (CORRIGIDO) =====
-    // Regra: (pause→resume) + (pause→resume) + ... + (pause→agora) quando houver pausa aberta.
-    // Importante: NÃO some incrementalmente em cima de um valor salvo, sempre recalcule do zero pelos eventos.
     const pauseTotalSecondsByResId = new Map();
-    const pauseClosedMsByResId = new Map();      // soma apenas pausas já encerradas
-    const openPauseStartMsByResId = new Map();   // pause aberto (sem resume)
+    const pauseClosedMsByResId = new Map();
+    const openPauseStartMsByResId = new Map();
 
     async function fetchPauseEvents(resIds){
-      // Preferência 1: reservation_events (event_type = pause/resume) — é o “evento real”, não o código gerado
       try{
         const { data, error } = await sb
           .from('reservation_events')
@@ -572,16 +706,9 @@ function nameOf(p){
           .in('reservation_id', resIds)
           .in('event_type', ['pause','resume'])
           .order('created_at', { ascending: true });
-
         if (error) throw error;
-
-        return (data || []).map(x => ({
-          reservation_id: x.reservation_id,
-          type: x.event_type,
-          created_at: x.created_at
-        }));
+        return (data || []).map(x => ({ reservation_id: x.reservation_id, type: x.event_type, created_at: x.created_at }));
       }catch(e1){
-        // Preferência 2: reservation_logs (event_type = pause/resume)
         try{
           const { data, error } = await sb
             .from('reservation_logs')
@@ -589,33 +716,20 @@ function nameOf(p){
             .in('reservation_id', resIds)
             .in('event_type', ['pause','resume'])
             .order('created_at', { ascending: true });
-
           if (error) throw error;
-
-          return (data || []).map(x => ({
-            reservation_id: x.reservation_id,
-            type: x.event_type,
-            created_at: x.created_at
-          }));
+          return (data || []).map(x => ({ reservation_id: x.reservation_id, type: x.event_type, created_at: x.created_at }));
         }catch(e2){
-          // Fallback final: reservation_codes (code_type = pause/resume)
           const { data, error } = await sb
             .from('reservation_codes')
             .select('reservation_id, code_type, created_at')
             .in('reservation_id', resIds)
             .in('code_type', ['pause','resume'])
             .order('created_at', { ascending: true });
-
           if (error) {
-            console.error('Erro ao buscar eventos de pausa (reservation_events / reservation_logs / reservation_codes):', error);
+            console.error('Erro ao buscar eventos de pausa:', error);
             return [];
           }
-
-          return (data || []).map(x => ({
-            reservation_id: x.reservation_id,
-            type: x.code_type,
-            created_at: x.created_at
-          }));
+          return (data || []).map(x => ({ reservation_id: x.reservation_id, type: x.code_type, created_at: x.created_at }));
         }
       }
     }
@@ -623,13 +737,10 @@ function nameOf(p){
     function calcPauseFromEvents(events, nowMs){
       let closedMs = 0;
       let openStartMs = null;
-
       for (const ev of (events || [])) {
         const t = new Date(ev.created_at).getTime();
         if (Number.isNaN(t)) continue;
-
         if (ev.type === 'pause') {
-          // Se já existe pausa aberta, IGNORA (evita duplicar/“reabrir” e bagunçar o total)
           if (openStartMs == null) openStartMs = t;
         } else if (ev.type === 'resume') {
           if (openStartMs != null) {
@@ -638,117 +749,108 @@ function nameOf(p){
           }
         }
       }
-
       const openMs = (openStartMs != null) ? Math.max(0, nowMs - openStartMs) : 0;
       return { closedMs, openStartMs, totalMs: closedMs + openMs };
     }
 
     if (pausados.length){
       const pausedResIds = pausados.map(r => r.id);
-
       const eventsAll = await fetchPauseEvents(pausedResIds);
-
       const byRes = new Map();
       (eventsAll || []).forEach(ev => {
         if (!byRes.has(ev.reservation_id)) byRes.set(ev.reservation_id, []);
         byRes.get(ev.reservation_id).push(ev);
       });
-
       const nowMs = Date.now();
       pausados.forEach(r => {
         const events = byRes.get(r.id) || [];
         const { closedMs, openStartMs, totalMs } = calcPauseFromEvents(events, nowMs);
-
         pauseClosedMsByResId.set(r.id, closedMs);
         if (openStartMs != null) openPauseStartMsByResId.set(r.id, openStartMs);
-
         pauseTotalSecondsByResId.set(r.id, Math.max(0, Math.floor(totalMs / 1000)));
       });
     }
 
-const listPresentes = presentes.map(r => `
-  <label class="flex items-center gap-3 py-2">
-    <input type="checkbox" class="picker-check scale-110" value="${r.profile_id}" data-res="${r.id}">
-    <span class="font-black">${nameOf(r.profiles)}</span>
-    <span class="text-xs text-slate-500">(${r.slots?.stores?.name || 'Loja'})</span>
-  </label>
-`).join('');
+    const listPresentes = presentes.map(r => `
+      <label class="flex items-center gap-3 py-2">
+        <input type="checkbox" class="picker-check scale-110" value="${r.profile_id}" data-res="${r.id}">
+        <span class="font-black">${escapeHtml(nameOf(r.profiles))}</span>
+        <span class="text-xs text-slate-500">(${escapeHtml(r.slots?.store?.name || 'Loja')})</span>
+      </label>
+    `).join('');
 
-const listPausados = pausados.map(r => {
-  const secs = pauseTotalSecondsByResId.get(r.id);
-  const mins = (secs === 0 || secs) ? Math.floor(secs / 60) : null;
-  const txt = (mins === 0 || mins) ? `Pausa total: ${mins} min` : 'Pausa total: —';
-  return `
-    <div class="flex items-center gap-3 py-2 opacity-70">
-      <input type="checkbox" class="scale-110" disabled>
-      <div class="flex flex-col">
-        <div class="font-black">
-          ${nameOf(r.profiles)}
-          <span class="pause-total text-[11px] text-orange-600 font-black ml-2" data-res="${r.id}">${txt}</span>
+    const listPausados = pausados.map(r => {
+      const secs = pauseTotalSecondsByResId.get(r.id);
+      const mins = (secs === 0 || secs) ? Math.floor(secs / 60) : null;
+      const txt = (mins === 0 || mins) ? `Pausa total: ${mins} min` : 'Pausa total: —';
+      return `
+        <div class="flex items-center gap-3 py-2 opacity-70">
+          <input type="checkbox" class="scale-110" disabled>
+          <div class="flex flex-col">
+            <div class="font-black">
+              ${escapeHtml(nameOf(r.profiles))}
+              <span class="pause-total text-[11px] text-orange-600 font-black ml-2" data-res="${r.id}">${escapeHtml(txt)}</span>
+            </div>
+            <div class="text-xs text-slate-500">${escapeHtml(r.slots?.store?.name || 'Loja')} • Não é possível atribuir durante a pausa</div>
+          </div>
         </div>
-        <div class="text-xs text-slate-500">${r.slots?.stores?.name || 'Loja'} • Não é possível atribuir durante a pausa</div>
-      </div>
-    </div>
-  `;
-}).join('');
+      `;
+    }).join('');
 
-const list = (listPresentes || '') + (listPausados ? `<div class="mt-3 pt-3 border-t"><div class="text-[10px] font-black uppercase text-slate-400 mb-2">Pausados (bloqueado)</div>${listPausados}</div>` : '');
+    const list = (listPresentes || '') + (listPausados ? `<div class="mt-3 pt-3 border-t"><div class="text-[10px] font-black uppercase text-slate-400 mb-2">Pausados (bloqueado)</div>${listPausados}</div>` : '');
 
-view.innerHTML = `
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="bg-white border rounded-2xl p-6 shadow-sm">
-      <h3 class="text-sm font-black uppercase text-slate-900 mb-4">Selecionar (check-in ativo)</h3>
-      <div class="max-h-80 overflow-auto border rounded-2xl p-3">${list || '<div class="text-slate-500 italic">Nenhum presente.</div>'}</div>
-    </div>
-
-    <div class="bg-white border rounded-2xl p-6 shadow-sm lg:col-span-2">
-      <h3 class="text-sm font-black uppercase text-slate-900 mb-4">Atribuir pedido</h3>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="text-[10px] font-black uppercase text-slate-400">Plataforma</label>
-          <input id="order-channel" class="w-full border rounded-xl p-3" placeholder="Ex: Janis, iFood, VTEX, etc" />
-          <p class="text-[11px] text-slate-500 mt-1">Digite o nome da plataforma (não é mais lista fixa).</p>
+    view.innerHTML = `
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white border rounded-2xl p-6 shadow-sm">
+          <h3 class="text-sm font-black uppercase text-slate-900 mb-4">Selecionar (check-in ativo)</h3>
+          <div class="max-h-80 overflow-auto border rounded-2xl p-3">${list || '<div class="text-slate-500 italic">Nenhum presente.</div>'}</div>
         </div>
-        <div>
-          <label class="text-[10px] font-black uppercase text-slate-400">Código do pedido</label>
-          <input id="order-code" class="w-full border rounded-xl p-3" placeholder="Ex: A1B2C3"/>
+
+        <div class="bg-white border rounded-2xl p-6 shadow-sm lg:col-span-2">
+          <h3 class="text-sm font-black uppercase text-slate-900 mb-4">Atribuir pedido</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-[10px] font-black uppercase text-slate-400">Plataforma</label>
+              <input id="order-channel" class="w-full border rounded-xl p-3" placeholder="Ex: Janis, iFood, VTEX, etc" />
+              <p class="text-[11px] text-slate-500 mt-1">Digite o nome da plataforma.</p>
+            </div>
+            <div>
+              <label class="text-[10px] font-black uppercase text-slate-400">Código do pedido</label>
+              <input id="order-code" class="w-full border rounded-xl p-3" placeholder="Ex: A1B2C3"/>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <label class="text-[10px] font-black uppercase text-slate-400">Mensagem (opcional)</label>
+            <textarea id="order-note" class="w-full border rounded-xl p-3" rows="3" placeholder="Observações..."></textarea>
+          </div>
+
+          <button id="btn-assign" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs py-3 rounded-xl">Atribuir</button>
+          <p class="text-xs text-slate-500 mt-3">Ao atribuir, o autônomo recebe um pop-up e pode aceitar ou recusar com justificativa.</p>
         </div>
       </div>
+    `;
 
-      <div class="mt-4">
-        <label class="text-[10px] font-black uppercase text-slate-400">Mensagem (opcional)</label>
-        <textarea id="order-note" class="w-full border rounded-xl p-3" rows="3" placeholder="Observações..."></textarea>
-      </div>
+    if (window.__pauseTotalTicker) {
+      clearInterval(window.__pauseTotalTicker);
+      window.__pauseTotalTicker = null;
+    }
 
-      <button id="btn-assign" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs py-3 rounded-xl">
-        Atribuir
-      </button>
-      <p class="text-xs text-slate-500 mt-3">Ao atribuir, o autônomo recebe um pop-up e pode aceitar ou recusar com justificativa.</p>
-    </div>
-  </div>
-`;
+    if (openPauseStartMsByResId.size) {
+      window.__pauseTotalTicker = setInterval(() => {
+        const nowMs = Date.now();
+        openPauseStartMsByResId.forEach((openStartMs, resId) => {
+          const closedMs = pauseClosedMsByResId.get(resId) || 0;
+          const totalMs = closedMs + Math.max(0, nowMs - openStartMs);
+          const mins = Math.floor(totalMs / 60000);
+          const el = document.querySelector(`.pause-total[data-res="${resId}"]`);
+          if (el) el.textContent = `Pausa total: ${mins} min`;
+        });
+      }, 1000);
+    }
 
-// Atualiza em tempo real (a cada 1s) o total de pausa quando existir pausa aberta (último pause sem resume)
-if (window.__pauseTotalTicker) {
-  clearInterval(window.__pauseTotalTicker);
-  window.__pauseTotalTicker = null;
-}
-
-if (openPauseStartMsByResId.size) {
-  window.__pauseTotalTicker = setInterval(() => {
-    const nowMs = Date.now();
-    openPauseStartMsByResId.forEach((openStartMs, resId) => {
-      const closedMs = pauseClosedMsByResId.get(resId) || 0;
-      const totalMs = closedMs + Math.max(0, nowMs - openStartMs);
-      const mins = Math.floor(totalMs / 60000);
-      const el = document.querySelector(`.pause-total[data-res="${resId}"]`);
-      if (el) el.textContent = `Pausa total: ${mins} min`;
-    });
-  }, 1000);
-}
-
-document.getElementById('btn-assign').onclick = async () => {
+    document.getElementById('btn-assign').onclick = async () => {
       try {
         const checked = Array.from(document.querySelectorAll('.picker-check:checked'));
         if (checked.length < 1) return alert('Selecione pelo menos 1 autônomo (check-in ativo).');
@@ -760,28 +862,25 @@ document.getElementById('btn-assign').onclick = async () => {
         if (!channel) return alert('Informe a plataforma.');
         if (!orderCode) return alert('Informe o código do pedido.');
 
-        // valida loja: os 2 precisam estar na mesma loja (via reservation slot)
         const resIds = checked.map(c => c.dataset.res);
         const baseRes = presentes.find(r => r.id === resIds[0]);
         const baseStore = baseRes?.slots?.store_id;
         const sameStore = resIds.every(rid => (presentes.find(r => r.id === rid)?.slots?.store_id) === baseStore);
         if (!sameStore) return alert('Todos os autônomos selecionados precisam estar na mesma loja para este pedido.');
 
-        // cria grupo (compatível com schema do ADM)
         const nowIso = new Date().toISOString();
         let groupId = null;
 
         try{
           const { data, error } = await sb.from('order_assignment_groups')
-            .insert({ store_id: baseStore, channel, order_code: orderCode, scheduled_at: nowIso })
+            .insert({ store_id: baseStore, channel, order_code: orderCode, manager_note: note || null, scheduled_at: nowIso })
             .select('id')
             .maybeSingle();
           if(error) throw error;
           groupId = data?.id;
         }catch(e1){
-          // fallback sem scheduled_at / colunas extras
           const { data, error } = await sb.from('order_assignment_groups')
-            .insert({ store_id: baseStore, channel, order_code: orderCode })
+            .insert({ store_id: baseStore, channel, order_code: orderCode, manager_note: note || null })
             .select('id')
             .maybeSingle();
           if(error) throw error;
@@ -790,26 +889,21 @@ document.getElementById('btn-assign').onclick = async () => {
 
         if(!groupId) throw new Error('Não consegui criar o grupo do pedido.');
 
-        // cria 2 assignments
-        const rows = checked.map(c => {
-          const rid = c.dataset.res;
-          const assignee = c.value;
-          return {
-            group_id: groupId,
-            reservation_id: rid,
-            assignee_profile_id: assignee,
-            status: 'pending_acceptance'
-          };
-        });
+        const rows = checked.map(c => ({
+          group_id: groupId,
+          reservation_id: c.dataset.res,
+          assignee_profile_id: c.value,
+          status: 'pending_acceptance'
+        }));
 
         const { error: asErr } = await sb.from('order_assignments').insert(rows);
         if (asErr) throw asErr;
 
         alert('Pedido atribuído. Aguardando aceite do(s) autônomo(s).');
+        document.getElementById('order-channel').value = '';
         document.getElementById('order-code').value = '';
         document.getElementById('order-note').value = '';
         checked.forEach(c => c.checked = false);
-
       } catch(e) {
         console.error(e);
         alert('Erro ao atribuir: ' + (e.message || e));
@@ -817,66 +911,224 @@ document.getElementById('btn-assign').onclick = async () => {
     };
   }
 
-  async function renderPedidos(){
-    setActiveTab('pedidos');
+async function renderPedidos(){
+  setActiveTab('pedidos');
+  const today = todayISO();
 
-    view.innerHTML = `<div class="text-center text-slate-500 italic p-10">Carregando pedidos...</div>`;
-
-    // lista pedidos por lojas do gerente
-    if (!storeIds.length) {
-      view.innerHTML = `<div class="p-8 text-slate-500 italic">Sem lojas atribuídas.</div>`;
-      return;
-    }
-
-    const { data, error } = await sb
-      .from('order_assignment_groups')
-      .select(`
-        id, store_id, channel, order_code, manager_note, created_at,
-        stores:store_id(name),
-        order_assignments(id, status, assignee_profile_id, items_count, completed_on_time, refusal_reason, late_reason,
-          profiles:assignee_profile_id(full_name,email)
-        )
-      `)
-      .in('store_id', storeIds)
-      .order('created_at', { ascending: false })
-      .limit(100);
-
-    if (error) {
-      console.error(error);
-      view.innerHTML = `<div class="p-6 text-red-600 font-bold">Erro: ${error.message}</div>`;
-      return;
-    }
-
-    const groups = (data || []).map(g => {
-      const loja = g.stores?.name || 'Loja';
-      const when = new Date(g.created_at).toLocaleString('pt-BR');
-      const a = (g.order_assignments || []).map(x => {
-        const nm = nameOf(x.profiles);
-        const st = x.status;
-        let extra = '';
-        if (st === 'refused' && x.refusal_reason) extra = ` • Recusa: ${x.refusal_reason}`;
-        if (st === 'completed') extra = ` • Itens: ${x.items_count ?? '-'} • No prazo: ${x.completed_on_time ? 'Sim' : 'Não'}${x.late_reason ? ' • Motivo: '+x.late_reason : ''}`;
-        return `<div class="text-sm"><span class="font-black">${nm}</span> <span class="text-xs uppercase font-black px-2 py-1 rounded-full border ml-2">${st}</span><span class="text-xs text-slate-500">${extra}</span></div>`;
-      }).join('');
-
-      return `
-        <div class="p-5 rounded-2xl border bg-white mb-3">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <div class="font-black text-slate-900">${g.channel} • ${g.order_code}</div>
-              <div class="text-xs text-slate-500">${loja} • ${when}</div>
-              ${g.manager_note ? `<div class="text-xs text-slate-600 mt-2"><span class="font-black">Obs:</span> ${g.manager_note}</div>` : ''}
-            </div>
-          </div>
-          <div class="mt-3 space-y-2">${a || '<div class="text-slate-500 italic">Sem atribuições.</div>'}</div>
+  view.innerHTML = `
+    <div class="bg-gray-50 border rounded-xl p-4 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-7 gap-3 items-end">
+        <div class="md:col-span-2">
+          <label class="text-xs text-gray-500 font-semibold">Status</label>
+          <select id="mgr-orders-status" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <option value="">Todos</option>
+            <option value="pending_acceptance">Pendente de aceite</option>
+            <option value="in_progress">Em andamento</option>
+            <option value="completed">Finalizado</option>
+            <option value="refused">Recusado</option>
+          </select>
         </div>
-      `;
-    }).join('');
 
-    view.innerHTML = groups || `<div class="p-8 text-slate-500 italic">Nenhum pedido.</div>`;
+        <div class="md:col-span-2">
+          <label class="text-xs text-gray-500 font-semibold">Buscar</label>
+          <input id="mgr-orders-search" type="text" placeholder="Código, canal, autônomo..." class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-500 font-semibold">Início</label>
+          <input id="mgr-orders-from" type="date" class="w-full border rounded-lg px-3 py-2 text-sm" value="${today}">
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-500 font-semibold">Fim</label>
+          <input id="mgr-orders-to" type="date" class="w-full border rounded-lg px-3 py-2 text-sm" value="${today}">
+        </div>
+
+        <div class="md:col-span-1 flex gap-2 justify-end">
+          <button id="mgr-orders-clear" class="w-full px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-bold">Limpar</button>
+        </div>
+      </div>
+      <div class="text-[11px] text-slate-500 mt-3">A loja agora é controlada pelo filtro geral no topo da tela.</div>
+    </div>
+
+    <div id="mgr-orders-results" class="space-y-3">
+      <div class="p-8 text-slate-500 italic">Carregando pedidos...</div>
+    </div>
+  `;
+
+  const resultsHost = document.getElementById('mgr-orders-results');
+  const scopedStoreIds = activeStoreIds();
+
+  if (!scopedStoreIds.length) {
+    resultsHost.innerHTML = '<div class="p-8 text-slate-500 italic bg-white rounded-2xl border">Nenhuma loja selecionada no filtro geral.</div>';
+    return;
   }
 
-  // Tabs
+  try {
+    const { data: groupsData, error: groupErr } = await sb
+      .from('order_assignment_groups')
+      .select('id, store_id, channel, order_code, manager_note, created_at')
+      .in('store_id', scopedStoreIds)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (groupErr) throw groupErr;
+
+    const groups = groupsData || [];
+    if (!groups.length) {
+      resultsHost.innerHTML = '<div class="p-8 text-slate-500 italic bg-white rounded-2xl border">Nenhum pedido encontrado para as lojas filtradas.</div>';
+      return;
+    }
+
+    const groupIds = groups.map(g => g.id);
+
+    let assignments = [];
+    if (groupIds.length) {
+      const { data: assignmentsData, error: assignmentsErr } = await sb
+        .from('order_assignments')
+        .select('id, group_id, status, assignee_profile_id, items_count, completed_on_time, refusal_reason, late_reason, created_at')
+        .in('group_id', groupIds)
+        .order('created_at', { ascending: true });
+
+      if (assignmentsErr) throw assignmentsErr;
+      assignments = assignmentsData || [];
+    }
+
+    const profileIds = [...new Set(assignments.map(x => x.assignee_profile_id).filter(Boolean))];
+
+    let profiles = [];
+    if (profileIds.length) {
+      const { data: profilesData, error: profilesErr } = await sb
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', profileIds);
+
+      if (profilesErr) throw profilesErr;
+      profiles = profilesData || [];
+    }
+
+    const profById = new Map((profiles || []).map(x => [x.id, x]));
+    const assignsByGroup = new Map();
+
+    assignments.forEach(a => {
+      if (!assignsByGroup.has(a.group_id)) assignsByGroup.set(a.group_id, []);
+      assignsByGroup.get(a.group_id).push({
+        ...a,
+        profiles: profById.get(a.assignee_profile_id) || null
+      });
+    });
+
+    const storeById = new Map(
+      access.map(a => [String(a.store_id), { name: a.stores?.name || 'Loja' }])
+    );
+
+    const hydratedGroups = groups.map(g => ({
+      ...g,
+      stores: storeById.get(String(g.store_id)) || { name: 'Loja' },
+      order_assignments: assignsByGroup.get(g.id) || []
+    }));
+
+    const renderFilteredOrders = () => {
+      const selectedStatus = (document.getElementById('mgr-orders-status')?.value || '').trim();
+      const q = (document.getElementById('mgr-orders-search')?.value || '').trim().toLowerCase();
+      const from = (document.getElementById('mgr-orders-from')?.value || '').trim();
+      const to = (document.getElementById('mgr-orders-to')?.value || '').trim();
+
+      const filteredGroups = hydratedGroups.filter(g => {
+        const groupDateIso = String((g.created_at || '')).slice(0,10);
+        if (from && groupDateIso && groupDateIso < from) return false;
+        if (to && groupDateIso && groupDateIso > to) return false;
+
+        const assigns = g.order_assignments || [];
+        if (selectedStatus && !assigns.some(x => x.status === selectedStatus)) return false;
+
+        if (q) {
+          const baseText = `${g.channel || ''} ${g.order_code || ''} ${g.stores?.name || ''}`.toLowerCase();
+          const hasInGroup = baseText.includes(q);
+          const hasInAssignee = assigns.some(x => {
+            const nm = nameOf(x.profiles).toLowerCase();
+            const em = (x.profiles?.email || '').toLowerCase();
+            return nm.includes(q) || em.includes(q);
+          });
+          if (!hasInGroup && !hasInAssignee) return false;
+        }
+
+        return true;
+      });
+
+      if (!filteredGroups.length) {
+        resultsHost.innerHTML = '<div class="p-8 text-slate-500 italic bg-white rounded-2xl border">Nenhum pedido para o filtro atual.</div>';
+        return;
+      }
+
+      resultsHost.innerHTML = filteredGroups.map(g => {
+        const loja = g.stores?.name || 'Loja';
+        const whenBase = g.created_at;
+        const when = whenBase ? new Date(whenBase).toLocaleString('pt-BR') : '-';
+
+        const assigns = (g.order_assignments || []).map(x => {
+          const nm = nameOf(x.profiles);
+          const st = x.status || '-';
+
+          let badge = 'border text-slate-700';
+          if (st === 'pending_acceptance') badge = 'bg-amber-100 text-amber-800 border-amber-200';
+          if (st === 'in_progress') badge = 'bg-blue-100 text-blue-800 border-blue-200';
+          if (st === 'completed') badge = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+          if (st === 'refused') badge = 'bg-red-100 text-red-800 border-red-200';
+
+          let extra = '';
+          if (st === 'refused' && x.refusal_reason) extra = ` • Recusa: ${x.refusal_reason}`;
+          if (st === 'completed') {
+            const prazo = (x.completed_on_time === null || x.completed_on_time === undefined) ? '-' : (x.completed_on_time ? 'Sim' : 'Não');
+            extra = ` • Itens: ${x.items_count ?? '-'} • No prazo: ${prazo}${x.late_reason ? ' • Motivo: ' + x.late_reason : ''}`;
+          }
+
+          return `
+            <div class="flex items-start justify-between gap-3 rounded-xl border p-3 bg-slate-50">
+              <div>
+                <div class="font-black text-slate-900">${escapeHtml(nm)}</div>
+                <div class="text-xs text-slate-500">${escapeHtml(x.profiles?.email || '')}</div>
+                ${extra ? `<div class="text-xs text-slate-500 mt-1">${escapeHtml(extra)}</div>` : ''}
+              </div>
+              <span class="text-[10px] uppercase font-black px-2 py-1 rounded-full border ${badge}">${escapeHtml(st)}</span>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="p-5 rounded-2xl border bg-white">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="font-black text-slate-900">${escapeHtml(g.channel || 'Pedido')} • ${escapeHtml(g.order_code || '-')}</div>
+                <div class="text-xs text-slate-500">${escapeHtml(loja)} • ${escapeHtml(when)}</div>
+                ${g.manager_note ? `<div class="text-xs text-slate-600 mt-2"><span class="font-black">Obs:</span> ${escapeHtml(g.manager_note)}</div>` : ''}
+              </div>
+            </div>
+            <div class="mt-3 space-y-2">${assigns || '<div class="text-slate-500 italic">Sem atribuições.</div>'}</div>
+          </div>
+        `;
+      }).join('');
+    };
+
+    document.getElementById('mgr-orders-status').onchange = renderFilteredOrders;
+    document.getElementById('mgr-orders-search').oninput = renderFilteredOrders;
+    document.getElementById('mgr-orders-from').onchange = renderFilteredOrders;
+    document.getElementById('mgr-orders-to').onchange = renderFilteredOrders;
+    document.getElementById('mgr-orders-clear').onclick = () => {
+      document.getElementById('mgr-orders-status').value = '';
+      document.getElementById('mgr-orders-search').value = '';
+      document.getElementById('mgr-orders-from').value = today;
+      document.getElementById('mgr-orders-to').value = today;
+      renderFilteredOrders();
+    };
+
+    renderFilteredOrders();
+  } catch (e) {
+    console.error(e);
+    resultsHost.innerHTML = `<div class="p-6 text-red-600 font-bold bg-white rounded-2xl border">Erro ao carregar pedidos: ${escapeHtml(e.message || e)}</div>`;
+  }
+}
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const tab = btn.dataset.tab;
@@ -886,12 +1138,16 @@ document.getElementById('btn-assign').onclick = async () => {
     });
   });
 
-  document.getElementById('btn-refresh').onclick = async () => {
-    const active = document.querySelector('.tab-btn.bg-slate-900')?.dataset?.tab || 'reservas';
-    if (active === 'reservas') return renderReservas();
-    if (active === 'atribuir') return renderAtribuir();
-    if (active === 'pedidos') return renderPedidos();
-  };
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const tab = btn.dataset.tab;
+      if (tab === 'reservas') return renderReservas();
+      if (tab === 'atribuir') return renderAtribuir();
+      if (tab === 'pedidos') return renderPedidos();
+    });
+  });
+
+  document.getElementById('btn-refresh').onclick = async () => rerenderCurrentTab();
 
   document.getElementById('btn-logout').onclick = async () => {
     await sb.auth.signOut();

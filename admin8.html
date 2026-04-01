@@ -269,68 +269,64 @@
     </div>
 
     
-    <div id="mod-pedidos" class="module-container bg-white">
-        <header class="h-16 border-b flex items-center px-8 justify-between shrink-0">
-            <div>
-                <h2 class="text-xl font-semibold text-gray-800">Operação do dia (Pedidos)</h2>
-                <p class="text-xs text-gray-500">ADM vê todas as lojas • agenda por status (agendado, check-in, pausa, atrasado)</p>
-            </div>
-        </header>
-
-        <div class="p-6 overflow-y-auto flex-1">
-            <!-- Filtros -->
-            <div class="bg-gray-50 border rounded-xl p-4 mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-9 gap-3 items-end">
-                    <div class="md:col-span-3 relative">
-                        <label class="text-xs text-gray-500 font-semibold">LOJAS</label>
-                        <input id="orders-store-search" type="text" placeholder="Digite para buscar lojas..." class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="off">
-                        <div id="orders-store-dd" class="hidden absolute mt-2 w-full bg-white border rounded-xl shadow-lg p-2 max-h-64 overflow-y-auto z-50"></div>
-                        <div id="orders-store-pill" class="text-xs text-gray-500 mt-2">Todas as lojas</div>
-                    </div>
-
-                    <div class="md:col-span-3">
-                        <label class="text-xs text-gray-500 font-semibold">Buscar autônomo</label>
-                        <input id="orders-worker-search" type="text" placeholder="Nome ou e-mail..." class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="off">
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="text-xs text-gray-500 font-semibold">Dia</label>
-                        <input id="orders-day" type="date" class="w-full border rounded-lg px-3 py-2 text-sm">
-                    </div>
-
-                    <div class="md:col-span-1 flex gap-2 justify-end">
-                        <button id="orders-clear" class="w-full px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-bold">Limpar</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Resumo por status -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-                <div class="border rounded-xl p-3 bg-white">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Agendados</div>
-                    <div id="orders-count-scheduled" class="text-2xl font-black text-gray-900">0</div>
-                </div>
-                <div class="border rounded-xl p-3 bg-white">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Check-in ativo</div>
-                    <div id="orders-count-active" class="text-2xl font-black text-gray-900">0</div>
-                </div>
-                <div class="border rounded-xl p-3 bg-white">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Em pausa</div>
-                    <div id="orders-count-paused" class="text-2xl font-black text-gray-900">0</div>
-                </div>
-                <div class="border rounded-xl p-3 bg-white">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Atrasados</div>
-                    <div id="orders-count-late" class="text-2xl font-black text-gray-900">0</div>
-                </div>
-                <div class="border rounded-xl p-3 bg-white">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Finalizados</div>
-                    <div id="orders-count-finished" class="text-2xl font-black text-gray-900">0</div>
-                </div>
-            </div>
-
-            <div id="orders-results" class="space-y-3"></div>
-        </div>
+    <div id="mod-pedidos" class="module-container bg-gray-50">
+  <header class="bg-white border-b shrink-0">
+    <div class="h-16 flex items-center px-8 justify-between">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-800">Gestão Operacional</h2>
+        <p id="adm-orders-subtitle" class="text-xs text-gray-500">ADM • todas as lojas</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-orders-refresh" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-bold hover:bg-gray-300">Atualizar</button>
+      </div>
     </div>
+
+    <div class="px-8 pb-4">
+      <div class="bg-gray-50 border rounded-2xl p-4">
+        <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+          <div class="flex-1 min-w-0">
+            <label class="text-[11px] font-black uppercase text-slate-500">Filtro geral de lojas</label>
+            <div class="relative mt-1" id="global-store-filter-wrap">
+              <button id="global-store-filter-btn" type="button" class="w-full border rounded-xl bg-white px-4 py-3 text-left text-sm flex items-center justify-between gap-3">
+                <span id="global-store-filter-label" class="truncate text-slate-700">Todas as lojas</span>
+                <span class="text-slate-400 text-xs font-bold">▼</span>
+              </button>
+
+              <div id="global-store-filter-panel" class="hidden absolute z-30 mt-2 w-full rounded-2xl border bg-white shadow-xl p-3">
+                <input id="global-store-filter-search" type="text" placeholder="Digite o nome da loja..." class="w-full border rounded-xl px-3 py-2 text-sm mb-3">
+
+                <label class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50 border-b mb-2">
+                  <input id="global-store-all" type="checkbox" class="scale-110">
+                  <span class="text-sm font-black text-slate-800">Todas</span>
+                </label>
+
+                <div id="global-store-options" class="max-h-64 overflow-auto space-y-1"></div>
+
+                <div class="flex gap-2 mt-3 pt-3 border-t">
+                  <button id="global-store-apply" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-xs py-3 rounded-xl">Aplicar</button>
+                  <button id="global-store-close" type="button" class="px-4 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black uppercase text-xs py-3 rounded-xl">Fechar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:w-auto">
+            <button id="global-store-clear" type="button" class="w-full lg:w-auto px-4 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-black uppercase text-xs">Limpar filtro geral</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="px-8 py-6 flex gap-3 overflow-x-auto shrink-0 bg-white border-b">
+  <button class="tab-btn subtab-btn active" data-tab="reservas">📋 Reservas do dia</button>
+  <button class="tab-btn subtab-btn" data-tab="atribuir">📦 Atribuir pedidos</button>
+  <button class="tab-btn subtab-btn" data-tab="pedidos">🧾 Pedidos</button>
+</div>
+
+<div id="view" class="flex-1 overflow-y-auto p-8"></div>
+</div>
+
     <div id="mod-atrasos" class="module-container bg-white">
     <header class="h-16 border-b flex items-center px-8 justify-between shrink-0">
         <div>
@@ -726,6 +722,7 @@ let allUsers = [];
         let allShifts = []; // Nova variável para turnos
         let pendingStatus = '';
 
+
         // ==== TRAVA ANTI-MULTICLIQUE (evita ações duplicadas e múltiplos e-mails) ====
         window.__actionLock = window.__actionLock || {};
         async function withActionLock(key, btn, fn){
@@ -828,8 +825,10 @@ let allUsers = [];
 
         function closeDecisionModal() { document.getElementById('decision-modal').classList.replace('flex', 'hidden'); }
 
+
 // --- MÓDULO FINANCEIRO ADM ---
 // --- MÓDULO FINANCEIRO ADM (BRUTO / DESCONTO / LÍQUIDO + CONFIRMAR EM LOTE) ---
+
 async function renderAdminFinance() {
   const container = document.getElementById('admin-finance-container');
   if (!container) return;
@@ -2564,36 +2563,71 @@ async function showMetrics() {
                 </div>`;
             }).join('') : '<div class="p-8 text-center text-gray-400">Nenhuma atividade registrada.</div>';
         }
-
-// --- LÓGICA DE NAVEGAÇÃO ENTRE MÓDULOS ---
-async function switchModule(moduleName) {
-    // 1. Atualiza visual da sidebar
-    const buttons = ['profiles', 'markets', 'metrics'];
-    buttons.forEach(b => {
-        const btn = document.getElementById(`nav-${b}`);
-        if(btn) {
-            btn.className = "w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent";
-            if(b === moduleName) {
+async function switchTab(tab) {
+    const menuItems = ['profiles', 'markets', 'metrics', 'credenciais', 'pontuacao', 'pedidos', 'atrasos', 'managers', 'finance', 'comunicados'];
+    menuItems.forEach(item => {
+        const btn = document.getElementById(`nav-${item}`);
+        if (btn) {
+            if (item === tab) {
                 btn.className = "w-full text-left px-4 py-3 rounded bg-gray-800 text-emerald-400 border-l-4 border-emerald-400 font-bold";
+            } else {
+                btn.className = "w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent";
             }
         }
     });
 
-    // 2. Esconde/Mostra áreas
-    document.getElementById('module-profiles').classList.add('hidden-section');
-    document.getElementById('module-markets').classList.add('hidden-section');
-    document.getElementById('module-metrics').classList.add('hidden-section');
+    document.querySelectorAll('.module-container').forEach(div => div.classList.remove('active'));
 
-    const target = document.getElementById(`module-${moduleName}`);
-    if(target) target.classList.remove('hidden-section');
+    if (tab === 'managers') {
+        const mod = document.getElementById('mod-managers');
+        if (mod) mod.classList.add('active');
 
-    // 3. Carrega dados específicos
-    if (moduleName === 'markets') {
-        const { data } = await _supabase.from('shifts').select('*'); // Carrega turnos
-        allShifts = data || [];
-        renderMarketSubTab('stores');
-    } else if (moduleName === 'metrics') {
-        showMetrics(); // Sua função existente
+        const financeSec = document.getElementById('finance-section');
+        if (financeSec) financeSec.classList.add('hidden');
+        return;
+    }
+
+    if (tab === 'finance') {
+        const profilesMod = document.getElementById('mod-profiles');
+        if (profilesMod) profilesMod.classList.add('active');
+
+        const financeSec = document.getElementById('finance-section');
+        if (financeSec) financeSec.classList.remove('hidden');
+
+        const autoSec = document.getElementById('autonomos-section');
+        if (autoSec) autoSec.classList.add('hidden');
+
+        return;
+    }
+
+    const financeSec = document.getElementById('finance-section');
+    if (financeSec) financeSec.classList.add('hidden');
+
+    const autoSec = document.getElementById('autonomos-section');
+    if (autoSec) autoSec.classList.remove('hidden');
+
+const target = document.getElementById(`mod-${tab}`);
+if (target) target.classList.add('active');
+
+if (tab === 'profiles') {
+    applyFilters();
+} else if (tab === 'markets') {
+    renderMarketTab('stores');
+} else if (tab === 'metrics') {
+    runMetricsLogic();
+} else if (tab === 'credenciais') {
+    renderPendingCredentials();
+} else if (tab === 'pontuacao') {
+    renderAdminPoints();
+} else if (tab === 'pedidos') {
+    if (!window.__admExtras) window.__admExtras = {};
+    if (!window.__admExtras.orders) window.__admExtras.orders = {};
+    if (!window.__admExtras.orders.currentMainTab) {
+        window.__admExtras.orders.currentMainTab = 'reservas';
+    }
+    await renderAdminOrders();
+} else if (tab === 'atrasos') {
+    renderDelayRequests();
     }
 }
 
@@ -2601,32 +2635,29 @@ async function switchModule(moduleName) {
 // OBS: os botões no HTML usam class="subtab-btn" e o container correto é #market-display.
 // Esta função garante que a gestão de mercados funcione sem depender do HTML antigo.
 async function renderMarketTab(tab) {
-    // Atualiza estilo das abas (subtab-btn)
-    const btns = Array.from(document.querySelectorAll('#mod-markets .subtab-btn'));
-    btns.forEach(b => b.classList.remove('active'));
-    const idx = tab === 'stores' ? 0 : tab === 'shifts' ? 1 : tab === 'slots' ? 2 : 3;
-    if (btns[idx]) btns[idx].classList.add('active');
+  const btns = Array.from(document.querySelectorAll('#mod-markets .subtab-btn'));
+  btns.forEach(b => b.classList.remove('active'));
 
-    const container = document.getElementById('market-display');
-    if (!container) return;
+  const idx = tab === 'stores' ? 0 : tab === 'shifts' ? 1 : tab === 'slots' ? 2 : 3;
+  if (btns[idx]) btns[idx].classList.add('active');
 
-    container.innerHTML = '<div class="text-center p-8 text-gray-500">Carregando dados...</div>';
+  const container = document.getElementById('market-display');
+  if (!container) return;
 
-    // Carrega turnos em memória (algumas telas usam allShifts)
-    try {
-        const { data } = await _supabase.from('shifts').select('*');
-        allShifts = data || [];
-    } catch(e) { /* ignore */ }
+  container.innerHTML = '<div class="text-center p-8 text-gray-500">Carregando dados...</div>';
 
-    if (tab === 'stores') await renderStoresTab(container);
-    else if (tab === 'shifts') await renderShiftsTab(container);
-    else if (tab === 'slots') await renderSlotsTab(container);
-    else if (tab === 'bookings') await renderBookingsTab(container);
+  try {
+    const { data } = await _supabase.from('shifts').select('*');
+    allShifts = data || [];
+  } catch (e) {}
+
+  if (tab === 'stores') await renderStoresTab(container);
+  else if (tab === 'shifts') await renderShiftsTab(container);
+  else if (tab === 'slots') await renderSlotsTab(container);
+  else if (tab === 'bookings') await renderBookingsTab(container);
 }
-// compat: se algum lugar ainda chamar renderMarketSubTab, redireciona
+
 const renderMarketSubTab = renderMarketTab;
-
-
 
 // 1. ABA MERCADOS
 
@@ -4404,7 +4435,7 @@ async function switchTab(tab) {
     } else if (tab === 'pontuacao') {
         renderAdminPoints();
     } else if (tab === 'pedidos') {
-        renderAdminOrders();
+    renderAdminOrders();
     }
     else if (tab === 'atrasos') {
     renderDelayRequests();
@@ -5798,65 +5829,649 @@ async function savePointsLine(profileId){
   }
 }
 
-/* ===== Pedidos ===== */
 async function renderAdminOrders(){
   await loadStoresOnce();
 
-  if(!renderAdminOrders.__inited){
-    // store multiselect
-    setupStoreMultiPicker({
-      inputId:'orders-store-search', ddId:'orders-store-dd', pillId:'orders-store-pill',
-      selectedSet: __admExtras.orders.selectedStoreIds,
-      onChange: () => renderAdminOrders() // refaz fetch/render
-    });
-
-    // default day = hoje
-    const dayEl = document.getElementById('orders-day');
-    if(dayEl && !dayEl.value){
-      const d = new Date();
-      const yyyy=d.getFullYear();
-      const mm=String(d.getMonth()+1).padStart(2,'0');
-      const dd=String(d.getDate()).padStart(2,'0');
-      dayEl.value = `${yyyy}-${mm}-${dd}`;
-    }
-
-    bindAutoFilters(['orders-worker-search','orders-day'], () => renderAdminOrders());
-
-    const clear = document.getElementById('orders-clear');
-    if(clear){
-      clear.addEventListener('click', () => {
-        __admExtras.orders.selectedStoreIds.clear();
-        ['orders-store-search','orders-worker-search'].forEach(id=>{
-          const el=document.getElementById(id); if(el) el.value='';
-        });
-        const pill=document.getElementById('orders-store-pill'); if(pill) pill.textContent='Todas as lojas';
-        const dayEl2=document.getElementById('orders-day');
-        if(dayEl2){
-          const d = new Date();
-          const yyyy=d.getFullYear();
-          const mm=String(d.getMonth()+1).padStart(2,'0');
-          const dd=String(d.getDate()).padStart(2,'0');
-          dayEl2.value = `${yyyy}-${mm}-${dd}`;
-        }
-        renderAdminOrders();
-      });
-    }
-
-    renderAdminOrders.__inited = true;
-  }
-
-  await loadOrdersAgendaAndRender();
-}
-
-async function loadOrdersAgendaAndRender(){
-  const host = document.getElementById('orders-results');
+  const host = document.getElementById('view');
   if(!host) return;
 
-  host.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Carregando agenda do dia...</div>`;
+  if(!window.__admExtras.orders) window.__admExtras.orders = {};
+  if(!window.__admExtras.orders.selectedStoreIds) window.__admExtras.orders.selectedStoreIds = new Set();
+  if(!window.__admExtras.orders.currentMainTab) window.__admExtras.orders.currentMainTab = 'reservas';
 
-  const storeSet = __admExtras.orders.selectedStoreIds;
-  const workerQ = (document.getElementById('orders-worker-search')?.value || '').toLowerCase().trim();
-  const day = document.getElementById('orders-day')?.value || '';
+  const selectedSet = window.__admExtras.orders.selectedStoreIds;
+  const allStores = (window.__admExtras.stores || []).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+
+  function activeStoreIds(){
+    return selectedSet.size ? Array.from(selectedSet) : allStores.map(s => s.id);
+  }
+
+  function refreshStoreLabel(){
+    const label = document.getElementById('global-store-filter-label');
+    const activeIds = activeStoreIds();
+    if (!label) return;
+
+    if (!selectedSet.size || activeIds.length === allStores.length) {
+      label.textContent = 'Todas as lojas';
+      return;
+    }
+
+    const names = allStores
+      .filter(s => activeIds.includes(s.id))
+      .map(s => s.name)
+      .filter(Boolean);
+
+    label.textContent = names.length ? names.join(', ') : 'Filtro geral aplicado';
+  }
+
+  function renderStoreOptions(searchTerm=''){
+    const q = String(searchTerm || '').toLowerCase().trim();
+    const activeIds = activeStoreIds();
+    const hostOpts = document.getElementById('global-store-options');
+    const allBox = document.getElementById('global-store-all');
+    if(!hostOpts || !allBox) return;
+
+    const filtered = allStores.filter(s => !q || String(s.name||'').toLowerCase().includes(q));
+
+    hostOpts.innerHTML = filtered.map(s => `
+      <label class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-50">
+        <input type="checkbox" class="global-store-item scale-110" value="${s.id}" ${activeIds.includes(s.id) ? 'checked' : ''}>
+        <span class="text-sm text-slate-800">${escapeHtml(s.name || 'Loja')}</span>
+      </label>
+    `).join('') || '<div class="text-sm text-slate-500 italic px-2 py-3">Nenhuma loja encontrada.</div>';
+
+    allBox.checked = activeIds.length === allStores.length;
+  }
+
+  function openStorePanel(){
+    document.getElementById('global-store-filter-panel')?.classList.remove('hidden');
+    renderStoreOptions(document.getElementById('global-store-filter-search')?.value || '');
+  }
+
+  function closeStorePanel(){
+    document.getElementById('global-store-filter-panel')?.classList.add('hidden');
+  }
+
+  function syncMainTabs(){
+  const current = window.__admExtras.orders.currentMainTab || 'reservas';
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.className = (btn.dataset.tab === current)
+      ? 'tab-btn subtab-btn active'
+      : 'tab-btn subtab-btn';
+  });
+}
+
+async function renderCurrentMainTab(){
+  const current = window.__admExtras.orders.currentMainTab || 'reservas';
+const host = document.getElementById('view');
+if (!host) return;
+
+if (current === 'reservas') {
+  if (!window.__admExtras) window.__admExtras = {};
+  if (!window.__admExtras.orders) window.__admExtras.orders = {};
+  if (!window.__admExtras.orders.currentResFilter) {
+    window.__admExtras.orders.currentResFilter = 'all';
+  }
+
+  const active = window.__admExtras.orders.currentResFilter || 'all';
+
+  host.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+  <div class="text-xs text-slate-500 font-bold">Filtros rápidos</div>
+  <button type="button" class="kpi-all px-3 py-1.5 rounded-xl border bg-white text-xs font-black ${active === 'all' ? 'ring-2 ring-slate-900' : ''}" data-filter="all">
+    Todas
+  </button>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+  <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left ${active === 'to_arrive' ? 'ring-2 ring-black' : ''}" data-filter="to_arrive">
+    <div class="text-xs font-bold text-gray-500 uppercase">Para chegar</div>
+    <div id="orders-count-scheduled" class="text-3xl font-black text-gray-900">0</div>
+  </button>
+
+  <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left ${active === 'late' ? 'ring-2 ring-black' : ''}" data-filter="late">
+    <div class="text-xs font-bold text-gray-500 uppercase">Check-in com atraso</div>
+    <div id="orders-count-late" class="text-3xl font-black text-red-600">0</div>
+  </button>
+
+  <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left ${active === 'paused' ? 'ring-2 ring-black' : ''}" data-filter="paused">
+    <div class="text-xs font-bold text-gray-500 uppercase">Pausados</div>
+    <div id="orders-count-paused" class="text-3xl font-black text-amber-700">0</div>
+  </button>
+
+  <button type="button" class="kpi-card rounded-2xl border bg-white p-4 text-left ${active === 'present' ? 'ring-2 ring-black' : ''}" data-filter="present">
+    <div class="text-xs font-bold text-gray-500 uppercase">Apresenta</div>
+    <div id="orders-count-active" class="text-3xl font-black text-green-600">0</div>
+  </button>
+
+</div>
+
+<div class="bg-white border rounded-2xl p-4 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <div class="md:col-span-2">
+          <label class="text-xs text-gray-500 font-semibold">Buscar autônomo</label>
+          <input id="orders-worker-search" type="text" placeholder="Nome ou e-mail..." class="w-full border rounded-lg px-3 py-2 text-sm" autocomplete="off">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 font-semibold">Dia</label>
+          <input id="orders-day" type="date" class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <div id="orders-results" class="space-y-3"></div>
+  `;
+
+  const dayEl = document.getElementById('orders-day');
+  if (dayEl && !dayEl.value) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    dayEl.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  document.querySelectorAll('.kpi-card, .kpi-all').forEach(btn => {
+    btn.onclick = async () => {
+      window.__admExtras.orders.currentResFilter = btn.dataset.filter || 'all';
+      await renderCurrentMainTab();
+    };
+  });
+
+  document.getElementById('orders-worker-search')?.addEventListener('input', () => loadOrdersAgendaAndRender('agenda'));
+  document.getElementById('orders-day')?.addEventListener('change', () => loadOrdersAgendaAndRender('agenda'));
+
+  await loadOrdersAgendaAndRender('agenda');
+  return;
+}
+
+  if (current === 'atribuir') {
+  await renderAtribuirAdmin();
+  return;
+}
+
+  if (current === 'pedidos') {
+  await renderPedidosAdmin();
+  return;
+}
+}  
+
+
+  if(!renderAdminOrders.__inited){
+    document.getElementById('btn-orders-refresh')?.addEventListener('click', () => renderAdminOrders());
+
+    document.getElementById('global-store-filter-btn')?.addEventListener('click', () => {
+      const panel = document.getElementById('global-store-filter-panel');
+      if(panel?.classList.contains('hidden')) openStorePanel();
+      else closeStorePanel();
+    });
+
+    document.getElementById('global-store-close')?.addEventListener('click', closeStorePanel);
+
+    document.getElementById('global-store-filter-search')?.addEventListener('input', (e) => {
+      renderStoreOptions(e.target.value || '');
+    });
+
+    document.getElementById('global-store-all')?.addEventListener('change', (e) => {
+  const checks = Array.from(document.querySelectorAll('.global-store-item'));
+  checks.forEach(c => { c.checked = e.target.checked; });
+});
+
+document.getElementById('global-store-apply')?.addEventListener('click', async () => {
+  selectedSet.clear();
+  Array.from(document.querySelectorAll('.global-store-item:checked')).forEach(x => selectedSet.add(x.value));
+  refreshStoreLabel();
+  closeStorePanel();
+  await renderCurrentMainTab();
+});
+
+    document.getElementById('global-store-clear')?.addEventListener('click', async () => {
+      selectedSet.clear();
+      const search = document.getElementById('global-store-filter-search');
+      if(search) search.value = '';
+      refreshStoreLabel();
+      renderStoreOptions('');
+      await renderCurrentMainTab();
+    });
+
+    document.addEventListener('click', (ev) => {
+      const wrap = document.getElementById('global-store-filter-wrap');
+      if (wrap && !wrap.contains(ev.target)) closeStorePanel();
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!window.__admExtras) window.__admExtras = {};
+    if (!window.__admExtras.orders) window.__admExtras.orders = {};
+
+    window.__admExtras.orders.currentMainTab = btn.dataset.tab;
+
+    syncMainTabs();
+    await renderCurrentMainTab();
+  });
+});
+
+       renderAdminOrders.__inited = true;
+  }
+
+  refreshStoreLabel();
+  renderStoreOptions('');
+  syncMainTabs();
+  await renderCurrentMainTab();
+}
+
+async function renderAtribuirAdmin() {
+  const host = document.getElementById('view');
+  if (!host) return;
+
+  host.innerHTML = `
+    <div class="bg-white border rounded-2xl p-5">
+      <div class="flex items-end justify-between gap-4 flex-wrap mb-4">
+        <div>
+          <div class="font-black uppercase text-slate-800">Atribuir pedidos</div>
+          <div class="text-xs text-slate-500">Selecione o dia e veja os autônomos aptos para atribuição.</div>
+        </div>
+
+        <div class="flex items-end gap-3">
+          <div>
+            <label class="text-xs text-gray-500 font-semibold">Dia</label>
+            <input id="adm-assign-day" type="date" class="border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <button id="adm-assign-refresh" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-bold hover:bg-gray-300">
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div id="adm-assign-results" class="space-y-3"></div>
+    </div>
+  `;
+
+  const dayEl = document.getElementById('adm-assign-day');
+  if (dayEl && !dayEl.value) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    dayEl.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  async function loadAssignables() {
+    const results = document.getElementById('adm-assign-results');
+    if (!results) return;
+
+    results.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Carregando autônomos para atribuição...</div>`;
+
+    const day = document.getElementById('adm-assign-day')?.value;
+    if (!day) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Selecione um dia.</div>`;
+      return;
+    }
+
+    const selectedStoreIds = Array.from(window.__admExtras?.orders?.selectedStoreIds || []);
+    let slotQuery = _supabase
+      .from('slots')
+      .select('id, date, store_id, shift_id, value')
+      .eq('date', day);
+
+    if (selectedStoreIds.length) {
+      slotQuery = slotQuery.in('store_id', selectedStoreIds);
+    }
+
+    const { data: slots, error: slotErr } = await slotQuery;
+    if (slotErr) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-red-600 font-semibold">Erro ao carregar slots: ${escapeHtml(slotErr.message)}</div>`;
+      return;
+    }
+
+    const slotIds = (slots || []).map(s => s.id);
+    if (!slotIds.length) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Nenhuma vaga encontrada para o dia selecionado.</div>`;
+      return;
+    }
+
+    let { data: reservations, error: resErr } = await _supabase
+  .from('reservations')
+  .select('id, slot_id, vacancy_id, profile_id, status, started_at, finished_at')
+  .or(
+    `slot_id.in.(${slotIds.join(',')}),vacancy_id.in.(${slotIds.join(',')})`
+  );
+
+    if (resErr) {
+      const retry = await _supabase
+        .from('reservations')
+        .select('id, slot_id, vacancy_id, profile_id, status, started_at, finished_at')
+        .in('vacancy_id', slotIds);
+
+      reservations = retry.data || [];
+      resErr = retry.error;
+    }
+
+    if (resErr) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-red-600 font-semibold">Erro ao carregar reservas: ${escapeHtml(resErr.message)}</div>`;
+      return;
+    }
+
+    const profileIds = [...new Set((reservations || []).map(r => r.profile_id).filter(Boolean))];
+    if (!profileIds.length) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Nenhuma reserva encontrada para o dia selecionado.</div>`;
+      return;
+    }
+
+    const { data: profiles, error: profErr } = await _supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', profileIds);
+
+    if (profErr) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-red-600 font-semibold">Erro ao carregar perfis: ${escapeHtml(profErr.message)}</div>`;
+      return;
+    }
+
+    const { data: stores } = await _supabase
+      .from('stores')
+      .select('id, name');
+
+    const { data: shifts } = await _supabase
+      .from('shifts')
+      .select('id, name, start_time, end_time');
+
+    const storeById = new Map((stores || []).map(x => [x.id, x]));
+    const shiftById = new Map((shifts || []).map(x => [x.id, x]));
+    const profileById = new Map((profiles || []).map(x => [x.id, x]));
+    const slotById = new Map((slots || []).map(x => [x.id, x]));
+
+    const eligible = (reservations || []).filter(r => {
+      const st = String(r.status || '').toLowerCase();
+      return st === 'presente' || st === 'em_pausa' || st === 'check-in' || st === 'checkin' || st === 'em pausa';
+    });
+
+    if (!eligible.length) {
+      results.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Nenhum autônomo apto para atribuição neste dia.</div>`;
+      return;
+    }
+
+    results.innerHTML = eligible.map(r => {
+      const prof = profileById.get(r.profile_id) || {};
+      const slot = slotById.get(r.slot_id || r.vacancy_id) || {};
+      const store = storeById.get(slot.store_id) || {};
+      const shift = shiftById.get(slot.shift_id) || {};
+      return `
+        <div class="border rounded-xl p-4 bg-white">
+          <div class="font-black text-slate-900">${escapeHtml(prof.full_name || '-')}</div>
+          <div class="text-sm text-slate-600">${escapeHtml(prof.email || '')}</div>
+          <div class="mt-2 text-xs text-slate-500">
+            Loja: <span class="font-bold text-slate-700">${escapeHtml(store.name || '-')}</span>
+            • Turno: <span class="font-bold text-slate-700">${escapeHtml(shift.name || '-')}</span>
+            ${shift.start_time ? `• ${escapeHtml(shift.start_time)}${shift.end_time ? ' - ' + escapeHtml(shift.end_time) : ''}` : ''}
+          </div>
+          <div class="mt-2 text-xs font-bold uppercase text-emerald-700">Status: ${escapeHtml(String(r.status || '-'))}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('adm-assign-refresh')?.addEventListener('click', loadAssignables);
+  document.getElementById('adm-assign-day')?.addEventListener('change', loadAssignables);
+
+  await loadAssignables();
+}
+
+async function renderPedidosAdmin() {
+  const host = document.getElementById('view');
+  if (!host) return;
+
+  host.innerHTML = `
+    <div class="bg-white border rounded-2xl p-5">
+      <div class="flex items-end justify-between gap-4 flex-wrap mb-4">
+        <div>
+          <div class="font-black uppercase text-slate-800">Pedidos atribuídos</div>
+          <div class="text-xs text-slate-500">Visualize os pedidos já atribuídos por dia.</div>
+        </div>
+
+        <div class="flex items-end gap-3">
+          <div>
+            <label class="text-xs text-gray-500 font-semibold">Dia</label>
+            <input id="orders-assigned-day" type="date" class="border rounded-lg px-3 py-2 text-sm">
+          </div>
+          <button id="btn-orders-assigned-refresh" class="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-bold hover:bg-gray-300">
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-auto border rounded-xl">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="p-3 text-left font-black">Hora</th>
+              <th class="p-3 text-left font-black">Loja</th>
+              <th class="p-3 text-left font-black">Autônomo</th>
+              <th class="p-3 text-left font-black">Canal / Código</th>
+              <th class="p-3 text-left font-black">Status</th>
+            </tr>
+          </thead>
+          <tbody id="adm-oa-tbody">
+            <tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Carregando pedidos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const dayEl = document.getElementById('orders-assigned-day');
+  if (dayEl && !dayEl.value) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    dayEl.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  async function loadAssignedOrders() {
+    const tbody = document.getElementById('adm-oa-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Carregando pedidos...</td></tr>`;
+
+    const day = document.getElementById('orders-assigned-day')?.value;
+    if (!day) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Selecione um dia.</td></tr>`;
+      return;
+    }
+
+    const selectedStoreIds = Array.from(window.__admExtras?.orders?.selectedStoreIds || []);
+
+    let slotQuery = _supabase
+      .from('slots')
+      .select('id, date')
+      .eq('date', day);
+
+    if (selectedStoreIds.length) {
+      const { data: allowedSlots, error: allowedErr } = await _supabase
+        .from('slots')
+        .select('id, date, store_id')
+        .eq('date', day)
+        .in('store_id', selectedStoreIds);
+
+      if (allowedErr) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-600 font-semibold">Erro ao filtrar lojas: ${escapeHtml(allowedErr.message)}</td></tr>`;
+        return;
+      }
+
+      const allowedIds = (allowedSlots || []).map(x => x.id);
+      if (!allowedIds.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Nenhum pedido para o filtro atual.</td></tr>`;
+        return;
+      }
+
+      slotQuery = _supabase
+        .from('slots')
+        .select('id, date')
+        .in('id', allowedIds);
+    }
+
+    const { data: slots, error: slotErr } = await slotQuery;
+    if (slotErr) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-600 font-semibold">Erro ao carregar slots: ${escapeHtml(slotErr.message)}</td></tr>`;
+      return;
+    }
+
+    const slotIds = (slots || []).map(s => s.id);
+    if (!slotIds.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Nenhum pedido para o filtro atual.</td></tr>`;
+      return;
+    }
+
+    let { data: reservations, error: resErr } = await _supabase
+      .from('reservations')
+      .select('id, slot_id, vacancy_id')
+      .in('slot_id', slotIds);
+
+    if (resErr) {
+      const retry = await _supabase
+        .from('reservations')
+        .select('id, slot_id, vacancy_id')
+        .in('vacancy_id', slotIds);
+
+      reservations = retry.data || [];
+      resErr = retry.error;
+    }
+
+    if (resErr) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-600 font-semibold">Erro ao carregar reservas: ${escapeHtml(resErr.message)}</td></tr>`;
+      return;
+    }
+
+    const reservationIds = (reservations || []).map(r => r.id);
+    if (!reservationIds.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Nenhum pedido para o filtro atual.</td></tr>`;
+      return;
+    }
+
+    const { data: assignments, error: assErr } = await _supabase
+      .from('order_assignments')
+      .select('id, group_id, reservation_id, assignee_profile_id, status, created_at, accepted_at, refused_at, completed_at')
+      .in('reservation_id', reservationIds);
+
+    if (assErr) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-600 font-semibold">Erro ao carregar atribuições: ${escapeHtml(assErr.message)}</td></tr>`;
+      return;
+    }
+
+    const groupIds = [...new Set((assignments || []).map(a => a.group_id).filter(Boolean))];
+    const profileIds = [...new Set((assignments || []).map(a => a.assignee_profile_id).filter(Boolean))];
+
+    const { data: groups } = groupIds.length
+      ? await _supabase
+          .from('order_assignment_groups')
+          .select('id, store_id, channel, order_code, created_at')
+          .in('id', groupIds)
+      : { data: [] };
+
+    const { data: profiles } = profileIds.length
+      ? await _supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', profileIds)
+      : { data: [] };
+
+    const { data: stores } = await _supabase
+      .from('stores')
+      .select('id, name');
+
+    const groupById = new Map((groups || []).map(x => [x.id, x]));
+    const profileById = new Map((profiles || []).map(x => [x.id, x]));
+    const storeById = new Map((stores || []).map(x => [x.id, x]));
+
+    const rows = (assignments || []).map(a => {
+      const g = groupById.get(a.group_id) || {};
+      const p = profileById.get(a.assignee_profile_id) || {};
+      const st = storeById.get(g.store_id) || {};
+      return {
+        created_at: a.created_at,
+        store_name: st.name || '-',
+        assignee_name: p.full_name || '-',
+        assignee_email: p.email || '',
+        channel: g.channel || '-',
+        order_code: g.order_code || '-',
+        status: a.status || '-'
+      };
+    });
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500 font-semibold">Nenhum pedido encontrado.</td></tr>`;
+      return;
+    }
+
+    function fmtHour(d) {
+      if (!d) return '-';
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return '-';
+      return dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function statusLabel(st) {
+      const map = {
+        pending_acceptance: 'Pendente',
+        in_progress: 'Em andamento',
+        completed: 'Concluído',
+        refused: 'Recusado'
+      };
+      return map[st] || st || '-';
+    }
+
+    tbody.innerHTML = rows.map(it => `
+      <tr class="border-t">
+        <td class="p-3 font-black text-slate-700">${fmtHour(it.created_at)}</td>
+        <td class="p-3 font-black text-slate-900">${escapeHtml(it.store_name)}</td>
+        <td class="p-3">
+          <div class="font-black text-slate-900">${escapeHtml(it.assignee_name)}</div>
+          <div class="text-xs text-slate-500">${escapeHtml(it.assignee_email)}</div>
+        </td>
+        <td class="p-3 font-black text-slate-900">${escapeHtml(it.channel)} • ${escapeHtml(it.order_code)}</td>
+        <td class="p-3 font-black text-slate-700">${escapeHtml(statusLabel(it.status))}</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('btn-orders-assigned-refresh')?.addEventListener('click', loadAssignedOrders);
+  document.getElementById('orders-assigned-day')?.addEventListener('change', loadAssignedOrders);
+
+  await loadAssignedOrders();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderAdminOrders();
+});
+
+async function loadOrdersAgendaAndRender(mode = 'agenda'){
+  const host = mode === 'assigned'
+    ? document.getElementById('adm-oa-tbody')
+    : document.getElementById('orders-results');
+  if(!host) return;
+
+if (mode === 'agenda') {
+  host.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Carregando agenda do dia...</div>`;
+}
+if (mode === 'assigned') {
+  host.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-gray-500 font-semibold">Carregando pedidos...</td></tr>`;
+}
+
+const storeSet = __admExtras.orders.selectedStoreIds;
+const workerQ = (document.getElementById('orders-worker-search')?.value || '').toLowerCase().trim();
+const day = (
+  mode === 'assigned'
+    ? document.getElementById('orders-assigned-day')?.value
+    : document.getElementById('orders-day')?.value
+) || (() => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+})();
 
   if(!day){
     host.innerHTML = `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Selecione um dia.</div>`;
@@ -6002,7 +6617,7 @@ async function loadOrdersAgendaAndRender(){
   // Build rows
   const rows = reservations
     .map(r=>{
-      const slot = slotById.get(r.slot_id);
+      const slot = slotById.get(r.slot_id || r.vacancy_id);
       const shift = slot ? (shiftById.get(slot.shift_id) || null) : null;
       const prof = profById.get(r.profile_id) || null;
       if(!slot || !prof) return null;
@@ -6047,9 +6662,62 @@ async function loadOrdersAgendaAndRender(){
   });
   updateOrdersCounters(counts);
 
-  const agendaHtml = rows.length
-  ? rows.map(x => renderAgendaRowCard(x)).join('')
+  const currentResFilter = window.__admExtras?.orders?.currentResFilter || 'all';
+
+let filteredRows = rows;
+
+if (currentResFilter !== 'all') {
+  filteredRows = rows.filter(x => {
+    const stNorm = normStatus(x.reservation?.status);
+
+    if (currentResFilter === 'late') {
+      return x.statusInfo?.key === 'late';
+    }
+
+    if (currentResFilter === 'present') {
+      return stNorm === 'present';
+    }
+
+    if (currentResFilter === 'paused') {
+      return stNorm === 'paused';
+    }
+
+    if (currentResFilter === 'to_arrive') {
+      return stNorm === 'to_arrive';
+    }
+
+    if (currentResFilter === 'done') {
+      return stNorm === 'done';
+    }
+
+    return true;
+  });
+}
+
+const agendaHtml = filteredRows.length
+  ? filteredRows.map(x => renderAgendaRowCard(x)).join('')
   : `<div class="border rounded-xl p-6 text-center text-gray-500 font-semibold">Sem resultados para o filtro atual.</div>`;
+
+if (mode === 'agenda') {
+  host.innerHTML = agendaHtml;
+
+  document.querySelectorAll('.btn-code').forEach(b => {
+  b.onclick = async () => {
+    try {
+      await adminDirectReservationAction(b.dataset.id, b.dataset.type);
+    } catch (e) {
+      alert(e.message || e);
+    }
+  };
+});
+
+  return;
+}
+  
+// render FINAL da agenda
+if (mode === 'agenda') {
+  host.innerHTML = agendaHtml;
+}
 
   // ===== Lista de pedidos atribuídos (com filtros) =====
   const storeById = new Map((allStores||[]).map(s=>[s.id,s]));
@@ -6167,40 +6835,15 @@ async function loadOrdersAgendaAndRender(){
     </div>
   `;
 
-  host.innerHTML = `
-  <div class="mb-6 flex gap-2">
-    <button id="orders-subtab-agenda" class="px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-xs uppercase">Operação do dia</button>
-    <button id="orders-subtab-assigned" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-black text-xs uppercase">Pedidos atribuídos</button>
-  </div>
-
-  <div id="orders-subview-agenda">${agendaHtml}</div>
-  <div id="orders-subview-assigned" class="hidden">${assignedSection}</div>
-`;
-
-const btnAgenda = document.getElementById('orders-subtab-agenda');
-const btnAssigned = document.getElementById('orders-subtab-assigned');
-const viewAgenda = document.getElementById('orders-subview-agenda');
-const viewAssigned = document.getElementById('orders-subview-assigned');
-
-function setOrdersSubview(mode){
-  const isAgenda = mode === 'agenda';
-
-  viewAgenda.classList.toggle('hidden', !isAgenda);
-  viewAssigned.classList.toggle('hidden', isAgenda);
-
-  btnAgenda.className = isAgenda
-    ? 'px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-xs uppercase'
-    : 'px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-black text-xs uppercase';
-
-  btnAssigned.className = !isAgenda
-    ? 'px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-xs uppercase'
-    : 'px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-black text-xs uppercase';
-}
-
-btnAgenda.onclick = () => setOrdersSubview('agenda');
-btnAssigned.onclick = () => setOrdersSubview('assigned');
-
-setOrdersSubview('agenda');
+document.querySelectorAll('.btn-code').forEach(b => {
+  b.onclick = async () => {
+    try {
+      await adminDirectReservationAction(b.dataset.id, b.dataset.type);
+    } catch(e){
+      alert(e.message || e);
+    }
+  };
+});
 
   // render + bind filtros
   function fmt(d){
@@ -6268,8 +6911,8 @@ setOrdersSubview('agenda');
   <div id="order-menu-${it.id}" class="hidden absolute right-3 mt-2 w-56 bg-white border rounded-2xl shadow-xl z-20 overflow-hidden">
     
     <button onclick="openEditAssignedOrder('${it.id}')" class="w-full text-left px-4 py-3 hover:bg-slate-50 font-bold text-sm">
-      Editar finalização
-    </button>
+  Editar pedido
+</button>
 
   </div>
 </td>
@@ -6295,9 +6938,10 @@ window.openEditAssignedOrder = function(orderId){
   }
 
   document.getElementById('adm-oa-edit-id').value = it.id;
-  document.getElementById('adm-oa-edit-items').value = it.items_count ?? '';
-  document.getElementById('adm-oa-edit-ontime').value = String(it.completed_on_time !== false);
-  document.getElementById('adm-oa-edit-late-reason').value = it.late_reason || '';
+document.getElementById('adm-oa-edit-items').value = it.items_count ?? '';
+document.getElementById('adm-oa-edit-assignee').value = it.assignee_profile_id || '';
+document.getElementById('adm-oa-edit-ontime').value = String(it.completed_on_time !== false);
+document.getElementById('adm-oa-edit-late-reason').value = it.late_reason || '';
 
   const wrap = document.getElementById('adm-oa-edit-late-wrap');
   wrap.classList.toggle('hidden', it.completed_on_time !== false);
@@ -6311,9 +6955,10 @@ window.closeAssignedOrderEditModal = function(){
 
 window.saveAssignedOrderEdit = async function(){
   const id = document.getElementById('adm-oa-edit-id').value;
-  const items = Number(document.getElementById('adm-oa-edit-items').value || 0);
-  const onTime = document.getElementById('adm-oa-edit-ontime').value === 'true';
-  const lateReason = (document.getElementById('adm-oa-edit-late-reason').value || '').trim();
+const items = Number(document.getElementById('adm-oa-edit-items').value || 0);
+const assigneeProfileId = (document.getElementById('adm-oa-edit-assignee').value || '').trim();
+const onTime = document.getElementById('adm-oa-edit-ontime').value === 'true';
+const lateReason = (document.getElementById('adm-oa-edit-late-reason').value || '').trim();
 
   if (!onTime && !lateReason) {
     alert('Informe o motivo do atraso.');
@@ -6321,13 +6966,14 @@ window.saveAssignedOrderEdit = async function(){
   }
 
   const { error } = await _supabase
-    .from('order_assignments')
-    .update({
-      items_count: items,
-      completed_on_time: onTime,
-      late_reason: onTime ? null : lateReason
-    })
-    .eq('id', id);
+  .from('order_assignments')
+  .update({
+    items_count: items,
+    assignee_profile_id: assigneeProfileId || null,
+    completed_on_time: onTime,
+    late_reason: onTime ? null : lateReason
+  })
+  .eq('id', id);
 
   if (error) {
     alert('Erro ao salvar: ' + error.message);
@@ -6381,6 +7027,143 @@ function updateOrdersCounters(c){
   set('orders-count-finished', c.finished);
 }
 
+async function adminDirectReservationAction(reservationId, actionType){
+  const nowIso = new Date().toISOString();
+  const { data: { session } } = await _supabase.auth.getSession();
+const adminEmail = session?.user?.email || null;
+
+  const { data: reservation, error: reservationErr } = await _supabase
+    .from('reservations')
+    .select('id, status, started_at, finished_at, pause_total_seconds, checking_last_at')
+    .eq('id', reservationId)
+    .maybeSingle();
+
+  if (reservationErr) {
+    alert('Erro ao carregar reserva: ' + reservationErr.message);
+    return;
+  }
+  if (!reservation) {
+    alert('Reserva não encontrada.');
+    return;
+  }
+
+  const currentPauseTotal = Number(reservation.pause_total_seconds || 0);
+
+  if (actionType === 'checkin') {
+    const { error: updErr } = await _supabase
+      .from('reservations')
+      .update({
+        status: 'check-in',
+        started_at: reservation.started_at || nowIso,
+        checking_last_at: nowIso
+      })
+      .eq('id', reservationId);
+
+    if (updErr) {
+      alert('Erro ao fazer check-in: ' + updErr.message);
+      return;
+    }
+
+    await _supabase.from('reservation_events').insert({
+      reservation_id: reservationId,
+      event_type: 'checkin',
+      actor_profile_id: session?.user?.id || null,
+      actor_admin_email: adminEmail,
+      meta: { source: 'admin_direct' }
+    });
+
+    await renderAdminOrders();
+    return;
+  }
+
+  if (actionType === 'pause') {
+    const { error: updErr } = await _supabase
+      .from('reservations')
+      .update({
+        status: 'pause',
+        checking_last_at: nowIso
+      })
+      .eq('id', reservationId);
+
+    if (updErr) {
+      alert('Erro ao pausar: ' + updErr.message);
+      return;
+    }
+
+    await _supabase.from('reservation_events').insert({
+      reservation_id: reservationId,
+      event_type: 'pause',
+      actor_profile_id: me?.id || null,
+      actor_admin_email: adminEmail,
+      meta: { source: 'admin_direct' }
+    });
+
+    await renderAdminOrders();
+    return;
+  }
+
+  if (actionType === 'resume') {
+    const { data: lastPause } = await _supabase
+      .from('reservation_events')
+      .select('created_at')
+      .eq('reservation_id', reservationId)
+      .eq('event_type', 'pause')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let extraPauseSeconds = 0;
+    if (lastPause?.created_at) {
+      const diffMs = new Date(nowIso).getTime() - new Date(lastPause.created_at).getTime();
+      extraPauseSeconds = Math.max(0, Math.floor(diffMs / 1000));
+    }
+
+    const { error: updErr } = await _supabase
+      .from('reservations')
+      .update({
+        status: 'check-in',
+        pause_total_seconds: currentPauseTotal + extraPauseSeconds,
+        checking_last_at: nowIso
+      })
+      .eq('id', reservationId);
+
+    if (updErr) {
+      alert('Erro ao retomar pausa: ' + updErr.message);
+      return;
+    }
+
+    await _supabase.from('reservation_events').insert({
+      reservation_id: reservationId,
+      event_type: 'resume',
+      actor_profile_id: me?.id || null,
+      actor_admin_email: adminEmail,
+      meta: { source: 'admin_direct' }
+    });
+
+    await renderAdminOrders();
+    return;
+  }
+
+  if (actionType === 'checkout') {
+    const { error: updErr } = await _supabase
+      .from('reservations')
+      .update({
+        status: 'check-out',
+        finished_at: nowIso,
+        checking_last_at: nowIso
+      })
+      .eq('id', reservationId);
+
+    if (updErr) {
+      alert('Erro ao fazer check-out: ' + updErr.message);
+      return;
+    }
+
+    await renderAdminOrders();
+    return;
+  }
+}
+
 function classifyAgendaStatus(r, whenIso){
   const st = String(r.status||'').toLowerCase();
   const started = !!r.started_at;
@@ -6401,7 +7184,32 @@ function classifyAgendaStatus(r, whenIso){
   return { key:'scheduled', label:'Agendado' };
 }
 
+function normStatus(s){
+  const v = (s || '').toString().toLowerCase().trim();
+
+  if ([
+    'em_andamento','em andamento','check-in','checkin','checking',
+    'check-in ativo','check_in','presente'
+  ].includes(v)) return 'present';
+
+  if ([
+    'pausa','pause','paused','em pausa','pausado','pausada'
+  ].includes(v)) return 'paused';
+
+  if ([
+    'confirmada','confirmado','confirmed','confirm'
+  ].includes(v)) return 'to_arrive';
+
+  if ([
+    'check-out','checkout','checked_out','check_out',
+    'finalizado','finalizada','completed','done'
+  ].includes(v)) return 'done';
+
+  return v;
+}
+
 function renderAgendaRowCard(x){
+
   const r = x.reservation;
   const slot = x.slot;
   const shift = x.shift;
@@ -6424,9 +7232,10 @@ function renderAgendaRowCard(x){
   const lastReason = (lastA?.refusal_reason || lastA?.decline_reason || lastA?.rejection_reason || '') || '';
   const lastStatus = lastA?.status || '';
 
-  const canCheckin = x.statusInfo.key === 'scheduled' || x.statusInfo.key === 'late';
-  const canPause = x.statusInfo.key === 'active';
-  const canCheckout = x.statusInfo.key === 'active' || x.statusInfo.key === 'paused';
+  const stNorm = normStatus(r.status);
+const canCI = stNorm !== 'present';
+const canCO = stNorm === 'present';
+const canResume = stNorm === 'paused';
 
   return `
     <div class="border rounded-2xl p-4 bg-white">
@@ -6446,41 +7255,34 @@ function renderAgendaRowCard(x){
           <div class="text-[11px] text-gray-500 mt-1">${escapeHtml(prof.email||'')}</div>
         </div>
 
-        <div class="flex flex-wrap gap-2 justify-end">
-          <button ${canCheckin?'':'disabled'} onclick="admDoCheckin('${r.id}')" class="px-3 py-2 rounded-lg text-xs font-black uppercase ${canCheckin?'bg-emerald-600 text-white hover:bg-emerald-700':'bg-gray-200 text-gray-400 cursor-not-allowed'}">Check-in</button>
-          <button ${canPause?'':'disabled'} onclick="admDoPause('${r.id}')" class="px-3 py-2 rounded-lg text-xs font-black uppercase ${canPause?'bg-amber-500 text-white hover:bg-amber-600':'bg-gray-200 text-gray-400 cursor-not-allowed'}">Pausar</button>
-          <button ${canCheckout?'':'disabled'} onclick="admDoCheckout('${r.id}')" class="px-3 py-2 rounded-lg text-xs font-black uppercase ${canCheckout?'bg-gray-900 text-white hover:bg-gray-800':'bg-gray-200 text-gray-400 cursor-not-allowed'}">Check-out</button>
-          <button onclick="toggleAssignBox('${r.id}')" class="px-3 py-2 rounded-lg text-xs font-black uppercase bg-blue-600 text-white hover:bg-blue-700">Atribuir pedido</button>
-        </div>
-      </div>
+        <div class="flex flex-wrap gap-2">
+  <button class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase ${canCI ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}" data-id="${r.id}" data-type="checkin" ${canCI ? '' : 'disabled'}>Gerar Check-in</button>
+  <button class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase ${canCO ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}" data-id="${r.id}" data-type="checkout" ${canCO ? '' : 'disabled'}>Gerar Check-out</button>
+  <button
+  class="btn-code px-3 py-2 rounded-xl text-xs font-black uppercase bg-amber-600 text-white"
+  data-id="${r.id}"
+  data-type="resume"
+  ${canResume ? '' : 'disabled'}
+  title="Disponível apenas quando a reserva está em pausa"
+>
+  Gerar Retomar
+</button>
+</div>
 
-      <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="border rounded-xl p-3 bg-gray-50">
-          <div class="text-[10px] font-bold text-gray-500 uppercase">Último pedido atribuído (no dia)</div>
-          ${
-            lastA ? `
-              <div class="mt-1 text-sm font-black text-gray-900">#${escapeHtml(lastCode||'')}</div>
-              <div class="text-xs text-gray-700">Plataforma: <span class="font-bold">${escapeHtml(lastPlat||'')}</span> • Status: <span class="font-bold">${escapeHtml(lastStatus||'')}</span></div>
-              ${lastMsg ? `<div class="text-xs text-gray-700 mt-1">Mensagem: ${escapeHtml(lastMsg)}</div>` : ''}
-              ${lastReason ? `<div class="text-xs text-red-600 font-bold mt-1">Motivo da recusa: ${escapeHtml(lastReason)}</div>` : ''}
-            ` : `<div class="text-sm text-gray-500 mt-1">Nenhum pedido atribuído ainda.</div>`
-          }
-        </div>
-
-        <div id="assign-box-${r.id}" class="border rounded-xl p-3 hidden">
-          <div class="text-[10px] font-bold text-gray-500 uppercase">Atribuir novo pedido</div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
-            <input id="assign-code-${r.id}" type="text" class="border rounded-lg px-3 py-2 text-sm" placeholder="Código do pedido" />
-            <input id="assign-platform-${r.id}" type="text" class="border rounded-lg px-3 py-2 text-sm" placeholder="Plataforma (você digita)" />
-            <input id="assign-msg-${r.id}" type="text" class="border rounded-lg px-3 py-2 text-sm" placeholder="Mensagem (opcional)" />
-          </div>
-          <div class="flex justify-end gap-2 mt-3">
-            <button onclick="toggleAssignBox('${r.id}', true)" class="px-3 py-2 rounded-lg text-xs font-black uppercase bg-gray-200 text-gray-700">Cancelar</button>
-            <button onclick="admAssignOrder('${r.id}','${slot.store_id}','${prof.id}')" class="px-3 py-2 rounded-lg text-xs font-black uppercase bg-blue-600 text-white hover:bg-blue-700">Salvar</button>
-          </div>
-        </div>
       </div>
-    </div>
+      <div class="mt-3">
+  <div class="border rounded-xl p-3 bg-gray-50">
+    <div class="text-[10px] font-bold text-gray-500 uppercase">Último pedido atribuído (no dia)</div>
+    ${
+      lastA ? `
+        <div class="mt-1 text-sm font-black text-gray-900">#${escapeHtml(lastCode||'')}</div>
+        <div class="text-xs text-gray-700">Plataforma: <span class="font-bold">${escapeHtml(lastPlat||'')}</span> • Status: <span class="font-bold">${escapeHtml(lastStatus||'')}</span></div>
+        ${lastMsg ? `<div class="text-xs text-gray-700 mt-1">Mensagem: ${escapeHtml(lastMsg)}</div>` : ''}
+        ${lastReason ? `<div class="text-xs text-red-600 font-bold mt-1">Motivo da recusa: ${escapeHtml(lastReason)}</div>` : ''}
+      ` : `<div class="text-sm text-gray-500 mt-1">Nenhum pedido atribuído ainda.</div>`
+    }
+  </div>
+</div>
   `;
 }
 
@@ -7558,6 +8360,11 @@ ${scopeLabel} • ${updated.require_ack ? 'Exige confirmação' : 'Sem confirma�
       <input type="hidden" id="adm-oa-edit-id">
 
       <div>
+  <label class="text-[10px] font-black uppercase text-slate-500">ID do autônomo</label>
+  <input id="adm-oa-edit-assignee" type="text" class="w-full border rounded-xl px-4 py-3 font-bold" placeholder="UUID do profile">
+</div>
+
+      <div>
         <label class="text-[10px] font-black uppercase text-slate-500">Quantidade de itens</label>
         <input id="adm-oa-edit-items" type="number" min="0" class="w-full border rounded-xl px-4 py-3 font-bold">
       </div>
@@ -7592,6 +8399,7 @@ ${scopeLabel} • ${updated.require_ack ? 'Exige confirmação' : 'Sem confirma�
       }
     });
   }
+
 </script>
 </body>
 </html>
