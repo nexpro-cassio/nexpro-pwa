@@ -665,43 +665,66 @@ function showPwaModal() {
 }
 
 enableNotificationsBtn?.addEventListener('click', async () => {
+  const originalBtnText = 'Ativar notificações';
+
   try {
+    enableNotificationsBtn.disabled = true;
+    enableNotificationsBtn.textContent = 'Ativando...';
+
+    if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+    if (pwaModalText) pwaModalText.textContent = 'Estamos ativando as notificações para este aparelho...';
+
     const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
 
-    if (!('serviceWorker' in navigator)) {
-      alert('Seu dispositivo não suporta notificações neste modo.');
-      return;
-    }
-
-    if (!('PushManager' in window)) {
-      alert('Seu dispositivo não suporta notificações neste modo.');
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (pwaModalText) {
+        pwaModalText.textContent = 'Este dispositivo não suporta notificações neste modo.';
+      }
+      enableNotificationsBtn.disabled = false;
+      enableNotificationsBtn.textContent = originalBtnText;
       return;
     }
 
     if (isIos && !isStandalone) {
-      alert('No iPhone, instale o app na Tela de Início e abra pelo ícone para ativar as notificações.');
+      if (pwaModalText) {
+        pwaModalText.textContent = 'No iPhone, primeiro instale o app na Tela de Início e abra pelo ícone para ativar as notificações.';
+      }
+      enableNotificationsBtn.disabled = false;
+      enableNotificationsBtn.textContent = originalBtnText;
+      return;
+    }
+
+    const currentPermission = Notification.permission;
+
+    if (currentPermission === 'denied') {
+      if (pwaModalText) {
+        pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
+      }
+      enableNotificationsBtn.disabled = false;
+      enableNotificationsBtn.textContent = originalBtnText;
       return;
     }
 
     const permission = await Notification.requestPermission();
 
     if (permission === 'denied') {
-  if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
-  if (pwaModalText) {
-    pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
-  }
-
-  enableNotificationsBtn.textContent = 'Entendi';
-  enableNotificationsBtn.onclick = () => hidePwaModal();
-
-  return;
-}
+      if (pwaModalText) {
+        pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
+      }
+      enableNotificationsBtn.disabled = false;
+      enableNotificationsBtn.textContent = originalBtnText;
+      return;
+    }
 
     if (permission !== 'granted') {
-      alert('Não foi possível ativar as notificações.');
+      if (pwaModalText) {
+        pwaModalText.textContent = 'Não foi possível ativar as notificações.';
+      }
+      enableNotificationsBtn.disabled = false;
+      enableNotificationsBtn.textContent = originalBtnText;
       return;
     }
 
@@ -732,84 +755,17 @@ enableNotificationsBtn?.addEventListener('click', async () => {
     }
 
   } catch (error) {
-  console.error('Erro ao ativar notificações:', error);
+    console.error('Erro ao ativar notificações:', error);
 
-  if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
-  if (pwaModalText) {
-    pwaModalText.textContent = 'Não foi possível ativar as notificações agora. Tente novamente.';
-  }
-
-  enableNotificationsBtn.textContent = 'Tentar novamente';
-}
-});
-
-function showInstallOnlyModal() {
-  if (!pwaModal) return;
-
-  pwaModal.classList.remove('hidden');
-
-  enableNotificationsBtn.textContent = 'Ativar notificações';
-enableNotificationsBtn.onclick = null;
-
-  if (pwaModalTitle) pwaModalTitle.textContent = 'Instale o app Nexpro';
-  if (pwaModalText) {
-    pwaModalText.textContent = 'Instale o app para usar sem barra do navegador e receber notificações.';
-  }
-
-  enableNotificationsBtn.classList.add('hidden');
-
-  const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-  const isStandalone =
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true;
-
-  if (isIos) {
-    installPwaBtn.classList.add('hidden');
-    iosInstallHint.classList.remove('hidden');
-    return;
-  }
-
-  iosInstallHint.classList.add('hidden');
-
-  if (!isStandalone && deferredPrompt) {
-    installPwaBtn.classList.remove('hidden');
-  } else {
-    installPwaBtn.classList.add('hidden');
-  }
-}
-
-installPwaBtn?.addEventListener('click', async () => {
-  try {
-    if (!deferredPrompt) {
-      alert('A instalação não está disponível neste dispositivo agora.');
-      return;
+    if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+    if (pwaModalText) {
+      pwaModalText.textContent = 'Não foi possível ativar as notificações agora. Tente novamente.';
     }
 
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    installPwaBtn.classList.add('hidden');
-  } catch (error) {
-    console.error('Erro ao instalar PWA:', error);
-    alert('Erro ao instalar o app.');
+    enableNotificationsBtn.disabled = false;
+    enableNotificationsBtn.textContent = originalBtnText;
   }
 });
-
-closePwaModal?.addEventListener('click', () => {
-  localStorage.setItem('pwaModalClosed', 'true');
-  hidePwaModal();
-});
-
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-});
-
-function hidePwaModal() {
-  if (!pwaModal) return;
-  pwaModal.classList.add('hidden');
-}
 
 // ==== MODO CORREÇÃO (reprovação) ====
 window.__correctionMode = false;
