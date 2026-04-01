@@ -767,6 +767,74 @@ enableNotificationsBtn?.addEventListener('click', async () => {
   }
 });
 
+function showInstallOnlyModal() {
+  if (!pwaModal) return;
+
+  pwaModal.classList.remove('hidden');
+
+  enableNotificationsBtn.textContent = 'Ativar notificações';
+enableNotificationsBtn.onclick = null;
+
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Instale o app Nexpro';
+  if (pwaModalText) {
+    pwaModalText.textContent = 'Instale o app para usar sem barra do navegador e receber notificações.';
+  }
+
+  enableNotificationsBtn.classList.add('hidden');
+
+  const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+  if (isIos) {
+    installPwaBtn.classList.add('hidden');
+    iosInstallHint.classList.remove('hidden');
+    return;
+  }
+
+  iosInstallHint.classList.add('hidden');
+
+  if (!isStandalone && deferredPrompt) {
+    installPwaBtn.classList.remove('hidden');
+  } else {
+    installPwaBtn.classList.add('hidden');
+  }
+}
+
+installPwaBtn?.addEventListener('click', async () => {
+  try {
+    if (!deferredPrompt) {
+      alert('A instalação não está disponível neste dispositivo agora.');
+      return;
+    }
+
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installPwaBtn.classList.add('hidden');
+  } catch (error) {
+    console.error('Erro ao instalar PWA:', error);
+    alert('Erro ao instalar o app.');
+  }
+});
+
+closePwaModal?.addEventListener('click', () => {
+  localStorage.setItem('pwaModalClosed', 'true');
+  hidePwaModal();
+});
+
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+
+function hidePwaModal() {
+  if (!pwaModal) return;
+  pwaModal.classList.add('hidden');
+}
+
 // ==== MODO CORREÇÃO (reprovação) ====
 window.__correctionMode = false;
 window.__correctionUserId = null;
