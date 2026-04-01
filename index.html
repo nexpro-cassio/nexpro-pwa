@@ -697,9 +697,7 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       return;
     }
 
-    const currentPermission = Notification.permission;
-
-    if (currentPermission === 'denied') {
+    if (Notification.permission === 'denied') {
       if (pwaModalText) {
         pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
       }
@@ -728,7 +726,20 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       return;
     }
 
-    const registration = await navigator.serviceWorker.ready;
+    let registration = await navigator.serviceWorker.getRegistration();
+
+    if (!registration) {
+      registration = await navigator.serviceWorker.register('/sw.js');
+    }
+
+    if (!registration) {
+      if (pwaModalText) {
+        pwaModalText.textContent = 'Não foi possível iniciar o serviço de notificações.';
+      }
+      enableNotificationsBtn.disabled = false;
+      enableNotificationsBtn.textContent = originalBtnText;
+      return;
+    }
 
     let subscription = await registration.pushManager.getSubscription();
 
@@ -757,7 +768,6 @@ enableNotificationsBtn?.addEventListener('click', async () => {
   } catch (error) {
     console.error('Erro ao ativar notificações:', error);
 
-    if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
     if (pwaModalText) {
       pwaModalText.textContent = 'Não foi possível ativar as notificações agora. Tente novamente.';
     }
@@ -1651,7 +1661,5 @@ async function savePushSubscription(subscription) {
 
 </script>
 
-</body>
-</html>
 </body>
 </html>
