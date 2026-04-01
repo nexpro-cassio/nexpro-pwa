@@ -666,10 +666,14 @@ function showPwaModal() {
 
 enableNotificationsBtn?.addEventListener('click', async () => {
   try {
+    alert('Clique recebido');
+
     const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
+
+    alert('isIos=' + isIos + ' | isStandalone=' + isStandalone);
 
     if (!('serviceWorker' in navigator)) {
       alert('Seu navegador não suporta Service Worker.');
@@ -686,40 +690,53 @@ enableNotificationsBtn?.addEventListener('click', async () => {
       return;
     }
 
+    alert('Antes do requestPermission');
+
     const permission = await Notification.requestPermission();
+
+    alert('permission=' + permission);
 
     if (permission !== 'granted') {
       alert('Permissão de notificações não concedida.');
       return;
     }
 
+    alert('Antes do serviceWorker.ready');
+
     const registration = await navigator.serviceWorker.ready;
+
+    alert('Service worker pronto');
 
     let subscription = await registration.pushManager.getSubscription();
 
     if (!subscription) {
+      alert('Criando subscription');
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array('BBJ1NfRn7E1xtmeAfvMJFssme9lGTQtce9a23yIehJ2PDlW8fOZl52GYQwld5EcQqd9sP8t_X0Ko0OVj9x5qv5k')
       });
+    } else {
+      alert('Subscription já existia');
     }
-  
 
-await savePushSubscription(subscription);
+    alert('Antes de salvar no banco');
 
-console.log('PUSH_SUBSCRIPTION', JSON.stringify(subscription));
-localStorage.setItem('pushEnabled', 'true');
-hidePwaModal();
+    await savePushSubscription(subscription);
 
-const role = (window.__lastProfile?.role || '').trim().toLowerCase();
+    alert('Subscription salva com sucesso');
 
-if (role === 'admin') {
-  window.location.href = 'admin.html';
-} else if (role === 'gerente' || role === 'manager') {
-  window.location.href = 'gerente.html';
-} else {
-  window.location.href = 'autonomo.html';
-}
+    localStorage.setItem('pushEnabled', 'true');
+    hidePwaModal();
+
+    const role = (window.__lastProfile?.role || '').trim().toLowerCase();
+
+    if (role === 'admin') {
+      window.location.href = 'admin.html';
+    } else if (role === 'gerente' || role === 'manager') {
+      window.location.href = 'gerente.html';
+    } else {
+      window.location.href = 'autonomo.html';
+    }
 
   } catch (error) {
     console.error('Erro ao ativar notificações:', error);
