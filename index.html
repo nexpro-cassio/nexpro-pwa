@@ -689,9 +689,16 @@ enableNotificationsBtn?.addEventListener('click', async () => {
     const permission = await Notification.requestPermission();
 
     if (permission === 'denied') {
-      alert('As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.');
-      return;
-    }
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+  if (pwaModalText) {
+    pwaModalText.textContent = 'As notificações estão bloqueadas no iPhone. Vá em Ajustes > Notificações > Nexpro e ative manualmente.';
+  }
+
+  enableNotificationsBtn.textContent = 'Entendi';
+  enableNotificationsBtn.onclick = () => hidePwaModal();
+
+  return;
+}
 
     if (permission !== 'granted') {
       alert('Não foi possível ativar as notificações.');
@@ -725,15 +732,24 @@ enableNotificationsBtn?.addEventListener('click', async () => {
     }
 
   } catch (error) {
-    console.error('Erro ao ativar notificações:', error);
-    alert('Não foi possível ativar as notificações agora. Tente novamente.');
+  console.error('Erro ao ativar notificações:', error);
+
+  if (pwaModalTitle) pwaModalTitle.textContent = 'Ative as notificações';
+  if (pwaModalText) {
+    pwaModalText.textContent = 'Não foi possível ativar as notificações agora. Tente novamente.';
   }
+
+  enableNotificationsBtn.textContent = 'Tentar novamente';
+}
 });
 
 function showInstallOnlyModal() {
   if (!pwaModal) return;
 
   pwaModal.classList.remove('hidden');
+
+  enableNotificationsBtn.textContent = 'Ativar notificações';
+enableNotificationsBtn.onclick = null;
 
   if (pwaModalTitle) pwaModalTitle.textContent = 'Instale o app Nexpro';
   if (pwaModalText) {
