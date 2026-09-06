@@ -36,6 +36,7 @@
       <button class="nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent" data-tab="pedidos">🧾 Pedidos</button>
       <button class="nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent" data-tab="corredores">🛒 Designar Corredores</button>
       <button class="nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent" data-tab="caixas">💳 Designar Caixas</button>
+      <button class="nav-btn w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent" id="nav-btn-pendencias" data-tab="pendencias">⚠️ Pendências <span id="pendencias-badge" class="hidden ml-1 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"></span></button>
       <button id="btn-logout" class="w-full text-left px-4 py-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white transition-colors font-bold border-l-4 border-transparent">🚪 Sair</button>
     </nav>
   </aside>
@@ -99,6 +100,7 @@
         <button class="tab-btn subtab-btn" data-tab="pedidos">🧾 Pedidos</button>
         <button class="tab-btn subtab-btn" data-tab="corredores">🛒 Corredores</button>
         <button class="tab-btn subtab-btn" data-tab="caixas">💳 Caixas</button>
+        <button class="tab-btn subtab-btn" data-tab="pendencias">⚠️ Pendências <span id="pendencias-badge-tab" class="hidden ml-1 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"></span></button>
       </div>
 
       <div id="view" class="flex-1 overflow-y-auto p-4 lg:p-8"></div>
@@ -1500,6 +1502,7 @@ async function renderPedidos(){
       if (tab === 'pedidos') return renderPedidos();
       if (tab === 'corredores') return renderCorredores();
       if (tab === 'caixas') return renderCaixas();
+      if (tab === 'pendencias') return renderPendencias();
     });
   });
 
@@ -1511,6 +1514,7 @@ async function renderPedidos(){
       if (tab === 'pedidos') return renderPedidos();
       if (tab === 'corredores') return renderCorredores();
       if (tab === 'caixas') return renderCaixas();
+      if (tab === 'pendencias') return renderPendencias();
     });
   });
 
@@ -1535,6 +1539,197 @@ async function renderPedidos(){
       }
     });
   }
+
+// ─── PENDÊNCIAS DE PEDIDO — GERENTE ──────────────────────────────────────
+let _gerentePendenciaSub = null;
+let _gerenteChatSub = null;
+
+async function renderPendencias() {
+  setActiveTab('pendencias');
+  const v = document.getElementById('view');
+  v.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Carregando...</div>';
+
+  const { data: groups } = await sb.from('order_assignment_groups')
+    .select('id, order_code, channel').in('store_id', storeIds);
+  const groupIds = (groups||[]).map(g => g.id);
+  if (!groupIds.length) { v.innerHTML = '<div style="padding:32px;text-align:center;color:#64748b;">Nenhuma pendência.</div>'; return; }
+
+  const { data: assignments } = await sb.from('order_assignments')
+    .select('id, assignee_profile_id, group_id, profiles:assignee_profile_id(full_name)')
+    .in('group_id', groupIds);
+  const assignIds = (assignments||[]).map(a => a.id);
+  if (!assignIds.length) { v.innerHTML = '<div style="padding:32px;text-align:center;color:#64748b;">Nenhuma pendência.</div>'; return; }
+
+  const { data: issues } = await sb.from('order_issues').select('*')
+    .in('assignment_id', assignIds).order('created_at', { ascending: false });
+
+  const assignMap = {};
+  (assignments||[]).forEach(a => { assignMap[a.id] = a; });
+  const groupMap = {};
+  (groups||[]).forEach(g => { groupMap[g.id] = g; });
+
+  const open = (issues||[]).filter(i => i.status === 'open');
+  const resolved = (issues||[]).filter(i => i.status === 'resolved');
+
+  updatePendenciasBadge(open.length);
+
+  const issueCard = (i) => {
+    const assign = assignMap[i.assignment_id];
+    const group = groupMap[assign?.group_id];
+    const nome = assign?.profiles?.full_name || '—';
+    const codigo = group?.order_code || '—';
+    const isOpen = i.status === 'open';
+    return `<div onclick="openGerenteIssueChat('${i.id}','${(i.title||'').replace(/'/g,"\'")}','${nome.replace(/'/g,"\'")}','${codigo}')"
+      style="background:white;border-radius:12px;border:1.5px solid ${isOpen?'#FAC775':'#e2e8f0'};padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;margin-bottom:8px;">
+      <div style="min-width:0;">
+        <p style="font-weight:600;font-size:13px;color:#0f172a;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(i.title)}</p>
+        <p style="font-size:11px;color:#64748b;margin:0;">${escapeHtml(nome)} · Pedido #${escapeHtml(codigo)}</p>
+      </div>
+      <span style="background:${isOpen?'#FAEEDA':'#EAF3DE'};color:${isOpen?'#854F0B':'#3B6D11'};padding:3px 10px;border-radius:99px;font-size:10px;font-weight:500;flex-shrink:0;">${isOpen?'Aguardando':'Resolvido'}</span>
+    </div>`;
+  };
+
+  v.innerHTML = `<div>
+    ${open.length ? `<p style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 10px;">Aguardando (${open.length})</p>
+    <div style="margin-bottom:24px;">${open.map(issueCard).join('')}</div>` : ''}
+    ${resolved.length ? `<p style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 10px;">Resolvidos (${resolved.length})</p>
+    <div>${resolved.map(issueCard).join('')}</div>` : ''}
+    ${!open.length && !resolved.length ? '<div style="padding:32px;text-align:center;color:#64748b;">Nenhuma pendência.</div>' : ''}
+  </div>`;
+
+  if (_gerentePendenciaSub) { sb.removeChannel(_gerentePendenciaSub); _gerentePendenciaSub = null; }
+  _gerentePendenciaSub = sb.channel('gerente-issues-'+Date.now())
+    .on('postgres_changes',{event:'*',schema:'public',table:'order_issues'},()=>{ renderPendencias(); })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_issue_messages'},()=>{ renderPendencias(); })
+    .subscribe();
+}
+
+async function openGerenteIssueChat(issueId, issueTitle, autonomoNome, pedidoCodigo) {
+  if (_gerenteChatSub) { sb.removeChannel(_gerenteChatSub); _gerenteChatSub = null; }
+  const v = document.getElementById('view');
+  v.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Carregando...</div>';
+
+  const [{ data: msgs }, { data: issue }] = await Promise.all([
+    sb.from('order_issue_messages').select('*, profiles!sender_id(full_name)').eq('issue_id', issueId).order('created_at'),
+    sb.from('order_issues').select('status').eq('id', issueId).maybeSingle()
+  ]);
+  const isResolved = issue?.status === 'resolved';
+
+  const renderMsg = (m) => {
+    const isMe = m.sender_id === me.id;
+    const name = m.profiles?.full_name || m.sender_role;
+    const time = new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};margin-bottom:8px;">
+      ${m.photo_url?`<img src="${m.photo_url}" style="border-radius:10px;max-width:200px;margin-bottom:4px;cursor:pointer;" onclick="window.open('${m.photo_url}')">` : ''}
+      ${m.message?`<div style="padding:8px 12px;border-radius:${isMe?'12px 12px 2px 12px':'12px 12px 12px 2px'};font-size:13px;max-width:80%;background:${isMe?'#E6F1FB':'#f1f5f9'};color:${isMe?'#185FA5':'#0f172a'};">${escapeHtml(m.message)}</div>` : ''}
+      <p style="font-size:10px;color:#64748b;margin:3px 0 0;">${isMe?'Você':name} · ${time}</p>
+    </div>`;
+  };
+
+  v.innerHTML = `<div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <button onclick="renderPendencias()" style="font-size:13px;color:#64748b;font-weight:700;background:none;border:none;cursor:pointer;">← Voltar</button>
+      ${!isResolved?`<button onclick="gerenteResolveIssue('${issueId}')" style="font-size:11px;font-weight:700;background:#EAF3DE;color:#3B6D11;padding:5px 10px;border:none;border-radius:8px;cursor:pointer;">✓ Resolver</button>`:'<span style="font-size:11px;color:#3B6D11;font-weight:700;">✅ Resolvido</span>'}
+    </div>
+    <div style="background:#f8fafc;border-radius:10px;padding:10px 14px;margin-bottom:12px;">
+      <p style="font-weight:600;font-size:13px;color:#0f172a;margin:0;">${escapeHtml(issueTitle)}</p>
+      <p style="font-size:11px;color:#64748b;margin:0;">${escapeHtml(autonomoNome)} · Pedido #${escapeHtml(pedidoCodigo)}</p>
+    </div>
+    <div id="gerente-issue-messages" style="min-height:200px;margin-bottom:12px;">
+      ${(msgs||[]).map(renderMsg).join('')}
+      ${!(msgs||[]).length?'<p style="text-align:center;color:#64748b;font-size:12px;padding:16px 0;">Nenhuma mensagem ainda.</p>':''}
+    </div>
+    ${!isResolved?`<div>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <label style="cursor:pointer;flex-shrink:0;"><input type="file" accept="image/*" style="display:none;" onchange="gerenteSendIssuePhoto('${issueId}',this)"><span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;background:#f1f5f9;border-radius:10px;font-size:18px;">📷</span></label>
+        <textarea id="gerente-issue-input" rows="2" placeholder="Responder..." style="flex:1;border:2px solid #e2e8f0;border-radius:12px;padding:8px 12px;font-size:13px;outline:none;resize:none;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();gerenteSendIssueMessage('${issueId}','${issueTitle.replace(/'/g,"\'")}','${autonomoNome.replace(/'/g,"\'")}','${pedidoCodigo}');}"></textarea>
+        <button onclick="gerenteSendIssueMessage('${issueId}','${issueTitle.replace(/'/g,"\'")}','${autonomoNome.replace(/'/g,"\'")}','${pedidoCodigo}')" style="width:40px;height:40px;background:#0f172a;color:white;border:none;border-radius:12px;font-size:16px;cursor:pointer;flex-shrink:0;">➤</button>
+      </div>
+    </div>`:'<div style="text-align:center;font-size:12px;color:#64748b;padding:12px;">Pendência resolvida.</div>'}
+  </div>`;
+
+  document.getElementById('gerente-issue-messages')?.scrollTo(0,999999);
+
+  _gerenteChatSub = sb.channel('gerente-chat-'+issueId)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_issue_messages',filter:'issue_id=eq.'+issueId},(payload)=>{
+      const el = document.getElementById('gerente-issue-messages');
+      if (!el) return;
+      const m = payload.new;
+      const isMe = m.sender_id === me.id;
+      const time = new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      if (isMe) return; // já foi adicionado otimisticamente
+      el.insertAdjacentHTML('beforeend',`<div style="display:flex;flex-direction:column;align-items:flex-start;margin-bottom:8px;">
+        ${m.message?`<div style="padding:8px 12px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:80%;background:#f1f5f9;color:#0f172a;">${escapeHtml(m.message)}</div>` : ''}
+        <p style="font-size:10px;color:#64748b;margin:3px 0 0;">${m.sender_role} · ${time}</p>
+      </div>`);
+      el.scrollTo(0,999999);
+    }).subscribe();
+}
+
+async function gerenteSendIssueMessage(issueId, issueTitle, autonomoNome, pedidoCodigo) {
+  const input = document.getElementById('gerente-issue-input');
+  const text = (input?.value||'').trim();
+  if (!text) return;
+  input.value = '';
+  const el = document.getElementById('gerente-issue-messages');
+  const time = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  if (el) {
+    el.insertAdjacentHTML('beforeend',`<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:8px;">
+      <div style="padding:8px 12px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:80%;background:#E6F1FB;color:#185FA5;">${escapeHtml(text)}</div>
+      <p style="font-size:10px;color:#64748b;margin:3px 0 0;">Você · ${time}</p>
+    </div>`);
+    el.scrollTo(0,999999);
+  }
+  await sb.from('order_issue_messages').insert({issue_id:issueId,sender_id:me.id,sender_role:'gerente',message:text});
+  try {
+    const { data: issue } = await sb.from('order_issues')
+      .select('order_assignments!assignment_id(assignee_profile_id)')
+      .eq('id', issueId).maybeSingle();
+    const userId = issue?.order_assignments?.assignee_profile_id;
+    if (userId) {
+      await sb.functions.invoke('send-push',{body:{user_id:userId,title:'💬 Resposta na pendência',body:text,data:{url:'/autonomo.html?screen=pedidos',tag:'issue-'+issueId}}});
+    }
+  } catch(e) { console.error('Erro notif:',e); }
+}
+
+async function gerenteSendIssuePhoto(issueId, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop();
+  const path = 'issue-photos/'+issueId+'-'+Date.now()+'.'+ext;
+  const { error: upErr } = await sb.storage.from('order-issues').upload(path, file);
+  if (upErr) return alert('Erro: ' + upErr.message);
+  const { data: { publicUrl } } = sb.storage.from('order-issues').getPublicUrl(path);
+  await sb.from('order_issue_messages').insert({issue_id:issueId,sender_id:me.id,sender_role:'gerente',photo_url:publicUrl});
+}
+
+async function gerenteResolveIssue(issueId) {
+  await sb.from('order_issues').update({status:'resolved'}).eq('id', issueId);
+  renderPendencias();
+}
+
+function updatePendenciasBadge(count) {
+  ['pendencias-badge','pendencias-badge-tab'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (count > 0) { el.textContent = count; el.classList.remove('hidden'); }
+    else el.classList.add('hidden');
+  });
+}
+
+async function checkPendenciasBadge() {
+  if (!storeIds.length) return;
+  const { data: groups } = await sb.from('order_assignment_groups').select('id').in('store_id', storeIds);
+  const groupIds = (groups||[]).map(g => g.id);
+  if (!groupIds.length) return;
+  const { data: assignments } = await sb.from('order_assignments').select('id').in('group_id', groupIds);
+  const assignIds = (assignments||[]).map(a => a.id);
+  if (!assignIds.length) return;
+  const { count } = await sb.from('order_issues').select('id',{count:'exact',head:true}).in('assignment_id',assignIds).eq('status','open');
+  updatePendenciasBadge(count||0);
+}
+// ─── FIM PENDÊNCIAS GERENTE ──────────────────────────────────────────────
+
 </script>
 </body>
 </html>

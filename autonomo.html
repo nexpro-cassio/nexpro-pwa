@@ -2621,6 +2621,207 @@ async function handleIncomingAssignment(assignmentId) {
     await recusarPedido(assignmentId);
 }
 }
+
+// ─── PENDÊNCIAS DE PEDIDO ────────────────────────────────────────────────
+async function renderIssues(assignmentId, pedidoCode) {
+    switchTab('nav-pedidos', 'Pendências');
+    const container = document.getElementById('view-container');
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--color-text-secondary);">Carregando...</div>';
+    const { data: issues } = await _sb.from('order_issues').select('*').eq('assignment_id', assignmentId).order('created_at');
+    container.innerHTML = `<div>
+        <button onclick="renderPedidos()" style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--color-text-secondary);font-weight:700;background:none;border:none;cursor:pointer;margin-bottom:16px;">← Voltar</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <h3 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;">Pendências</h3>
+            <button onclick="openNewIssueModal('${assignmentId}')" style="background:#0f172a;color:white;padding:8px 14px;border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;">+ Adicionar</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            ${!(issues||[]).length ? '<p style="text-align:center;color:var(--color-text-secondary);font-size:13px;padding:32px 0;">Nenhuma pendência.</p>' :
+            (issues||[]).map(i => `<div onclick="openIssueChat('${i.id}','${(i.title||'').replace(/'/g,"\'")}'); " style="background:var(--color-background-primary);border-radius:12px;border:0.5px solid var(--color-border-tertiary);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
+                <div><p style="font-weight:500;font-size:13px;color:#0f172a;margin:0;">${escapeHtml(i.title)}</p><p style="font-size:11px;color:#64748b;margin:0;">${i.status==='resolved'?'✅ Resolvido':'⏳ Aguardando'}</p></div>
+                <span style="color:var(--color-text-secondary);">→</span>
+            </div>`).join('')}
+        </div>
+    </div>`;
+}
+
+function openNewIssueModal(assignmentId) {
+    document.body.insertAdjacentHTML('beforeend', `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:70;padding:16px;" id="modal-issue">
+        <div style="background:white;border-radius:16px;width:100%;max-width:380px;padding:24px;">
+            <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;color:#111;margin:0 0 16px;">Nova pendência</h3>
+            <input type="text" id="issue-title" placeholder="Descreva o problema..." style="width:100%;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:16px;outline:none;box-sizing:border-box;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button onclick="document.getElementById('modal-issue').remove()" style="padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;background:transparent;cursor:pointer;">Cancelar</button>
+                <button onclick="saveNewIssue('${assignmentId}')" style="padding:10px;background:#0f172a;color:white;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">Salvar</button>
+            </div>
+        </div>
+    </div>`);
+    document.getElementById('issue-title').focus();
+}
+
+async function saveNewIssue(assignmentId) {
+    const title = document.getElementById('issue-title')?.value.trim();
+    if (!title) return alert('Descreva o problema.');
+    const { data, error } = await _sb.from('order_issues').insert({ assignment_id: assignmentId, profile_id: currentUser.id, title, status: 'open' }).select('id').maybeSingle();
+    if (error) return alert('Erro: ' + error.message);
+    document.getElementById('modal-issue')?.remove();
+    openIssueChat(data.id, title);
+}
+
+let _issueChatSub = null;
+
+async function openIssueChat(issueId, issueTitle) {
+    if (_issueChatSub) { _sb.removeChannel(_issueChatSub); _issueChatSub = null; }
+    const container = document.getElementById('view-container');
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--color-text-secondary);">Carregando...</div>';
+    const [{ data: issue }, { data: msgs }] = await Promise.all([
+        _sb.from('order_issues').select('*, order_assignments!assignment_id(order_assignment_groups!group_id(order_code))').eq('id', issueId).maybeSingle(),
+        _sb.from('order_issue_messages').select('*, profiles!sender_id(full_name)').eq('issue_id', issueId).order('created_at')
+    ]);
+    const isResolved = issue?.status === 'resolved';
+    const renderMsg = (m) => {
+        const isMe = m.sender_id === currentUser.id;
+        const name = m.profiles?.full_name || m.sender_role;
+        const time = new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};margin-bottom:8px;">
+            ${m.photo_url?`<img src="${m.photo_url}" style="border-radius:10px;max-width:200px;margin-bottom:4px;cursor:pointer;" onclick="window.open('${m.photo_url}')">` : ''}
+            ${m.message?`<div style="padding:8px 12px;border-radius:${isMe?'12px 12px 2px 12px':'12px 12px 12px 2px'};font-size:13px;max-width:80%;background:${isMe?'#E1F5EE':'var(--color-background-secondary)'};color:${isMe?'#085041':'var(--color-text-primary)'};">${escapeHtml(m.message)}</div>` : ''}
+            <p style="font-size:10px;color:var(--color-text-secondary);margin:3px 0 0;">${isMe?'Você':name} · ${time}</p>
+        </div>`;
+    };
+    container.innerHTML = `<div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;">
+            <button onclick="if(_issueChatSub){_sb.removeChannel(_issueChatSub);_issueChatSub=null;} renderPedidos()" style="font-size:13px;color:var(--color-text-secondary);font-weight:700;background:none;border:none;cursor:pointer;">← Voltar</button>
+            ${!isResolved?`<button onclick="resolveIssue('${issueId}')" style="font-size:11px;font-weight:700;background:#EAF3DE;color:#3B6D11;padding:5px 10px;border:none;border-radius:8px;cursor:pointer;">✓ Resolver</button>`:'<span style="font-size:11px;color:#3B6D11;font-weight:700;">✅ Resolvido</span>'}
+        </div>
+        <div style="background:var(--color-background-secondary);border-radius:10px;padding:10px 14px;margin-bottom:12px;flex-shrink:0;">
+            <p style="font-weight:600;font-size:13px;color:#0f172a;margin:0;">${escapeHtml(issue?.title||issueTitle)}</p>
+            <p style="font-size:11px;color:#64748b;margin:0;">Pedido #${escapeHtml(issue?.order_assignments?.order_assignment_groups?.order_code||'—')}</p>
+        </div>
+        <div id="issue-messages" style="flex:1;overflow-y:auto;margin-bottom:12px;">
+            ${(msgs||[]).map(renderMsg).join('')}
+            ${!(msgs||[]).length?'<p style="text-align:center;color:var(--color-text-secondary);font-size:12px;padding:16px 0;">Nenhuma mensagem ainda.</p>':''}
+        </div>
+        ${!isResolved?`<div class="issue-chat-input-area" style="flex-shrink:0;">
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <label style="cursor:pointer;flex-shrink:0;"><input type="file" accept="image/*" style="display:none;" onchange="sendIssuePhoto('${issueId}',this)"><span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;background:#f1f5f9;border-radius:10px;font-size:18px;">📷</span></label>
+                <textarea id="issue-msg-input" rows="2" placeholder="Mensagem..." style="flex:1;border:2px solid #e2e8f0;border-radius:12px;padding:8px 12px;font-size:13px;outline:none;resize:none;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendIssueMessage('${issueId}');}"></textarea>
+                <button onclick="sendIssueMessage('${issueId}')" style="width:40px;height:40px;background:#0f172a;color:white;border:none;border-radius:12px;font-size:16px;cursor:pointer;flex-shrink:0;">➤</button>
+            </div>
+        </div>`:'<div style="text-align:center;font-size:12px;color:#64748b;padding:12px;flex-shrink:0;">Pendência resolvida.</div>'}
+    </div>`;
+    const main = document.querySelector('main');
+    const view = document.getElementById('view-container');
+    if (main) { main.classList.add('overflow-y-auto'); main.style.overflow=''; main.style.display=''; main.style.flexDirection=''; }
+    if (view) { view.style.padding='16px'; view.style.flex=''; view.style.overflow=''; view.style.display=''; view.style.flexDirection=''; }
+    document.getElementById('issue-messages')?.scrollTo(0, 999999);
+    _issueChatSub = _sb.channel('issue-'+issueId)
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:'order_issue_messages',filter:'issue_id=eq.'+issueId},(payload)=>{
+            const el = document.getElementById('issue-messages');
+            if (!el) return;
+            const m = payload.new;
+            const isMe = m.sender_id === currentUser.id;
+            const time = new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+            const html = `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};margin-bottom:8px;">
+                ${m.photo_url?`<img src="${m.photo_url}" style="border-radius:10px;max-width:200px;margin-bottom:4px;">` : ''}
+                ${m.message?`<div style="padding:8px 12px;border-radius:${isMe?'12px 12px 2px 12px':'12px 12px 12px 2px'};font-size:13px;max-width:80%;background:${isMe?'#E1F5EE':'#f1f5f9'};color:${isMe?'#085041':'#0f172a'};">${escapeHtml(m.message)}</div>` : ''}
+                <p style="font-size:10px;color:#64748b;margin:3px 0 0;">${isMe?'Você':m.sender_role} · ${time}</p>
+            </div>`;
+            el.insertAdjacentHTML('beforeend', html);
+            el.scrollTo(0,999999);
+        }).subscribe();
+}
+
+async function sendIssueMessage(issueId) {
+    const input = document.getElementById('issue-msg-input');
+    const text = (input?.value||'').trim();
+    if (!text) return;
+    input.value = '';
+    // Adiciona na tela imediatamente
+    const el = document.getElementById('issue-messages');
+    const now = new Date();
+    const time = now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    if (el) {
+        el.insertAdjacentHTML('beforeend', `<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:8px;">
+            <div style="padding:8px 12px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:80%;background:#E1F5EE;color:#085041;">${escapeHtml(text)}</div>
+            <p style="font-size:10px;color:#64748b;margin:3px 0 0;">Você · ${time}</p>
+        </div>`);
+        el.scrollTo(0,999999);
+    }
+    await _sb.from('order_issue_messages').insert({issue_id:issueId,sender_id:currentUser.id,sender_role:'autonomo',message:text,created_at:now.toISOString()});
+    await notifyIssueGerente(issueId, text);
+}
+
+async function sendIssuePhoto(issueId, input) {
+    const file = input.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop();
+    const path = 'issue-photos/'+issueId+'-'+Date.now()+'.'+ext;
+    const { error: upErr } = await _sb.storage.from('order-issues').upload(path, file);
+    if (upErr) return alert('Erro ao enviar foto: ' + upErr.message);
+    const { data: { publicUrl } } = _sb.storage.from('order-issues').getPublicUrl(path);
+    await _sb.from('order_issue_messages').insert({issue_id:issueId,sender_id:currentUser.id,sender_role:'autonomo',photo_url:publicUrl});
+    await notifyIssueGerente(issueId,'📷 Foto enviada');
+}
+
+async function notifyIssueGerente(issueId, preview) {
+    try {
+        const { data: issue } = await _sb.from('order_issues').select('order_assignments!assignment_id(order_assignment_groups!group_id(store_id,order_code))').eq('id',issueId).maybeSingle();
+        const storeId = issue?.order_assignments?.order_assignment_groups?.store_id;
+        const orderCode = issue?.order_assignments?.order_assignment_groups?.order_code||'';
+        if (!storeId) return;
+        const { data: gerentes } = await _sb.from('profiles').select('id').eq('store_id',storeId).in('role',['gerente','manager']);
+        for (const g of gerentes||[]) { await _sb.functions.invoke('send-push',{body:{user_id:g.id,title:'⚠️ Pendência no pedido #'+orderCode,body:preview,data:{url:'/gerente.html',tag:'issue-'+issueId}}}); }
+    } catch(e) { console.error('Erro notif gerente:',e); }
+}
+
+async function resolveIssue(issueId) {
+    await _sb.from('order_issues').update({status:'resolved'}).eq('id',issueId);
+    const btn = document.querySelector('[onclick*="resolveIssue"]');
+    if (btn) btn.outerHTML = '<span style="font-size:11px;color:#3B6D11;font-weight:700;">✅ Resolvido</span>';
+}
+async function renderAllIssues() {
+    switchTab('nav-pedidos', 'Pendências');
+    const container = document.getElementById('view-container');
+    container.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Carregando...</div>';
+
+    // Busca todos pedidos do autônomo
+    const { data: assignments } = await _sb.from('order_assignments')
+        .select('id, order_assignment_groups!group_id(order_code, channel)')
+        .eq('assignee_profile_id', currentUser.id);
+
+    const assignIds = (assignments||[]).map(a => a.id);
+    if (!assignIds.length) {
+        container.innerHTML = '<div style="padding:32px;text-align:center;color:#64748b;">Nenhuma pendência.</div>';
+        return;
+    }
+
+    const { data: issues } = await _sb.from('order_issues')
+        .select('*')
+        .in('assignment_id', assignIds)
+        .order('created_at', { ascending: false });
+
+    const assignMap = {};
+    (assignments||[]).forEach(a => { assignMap[a.id] = a; });
+
+    container.innerHTML = `<div>
+        <button onclick="renderPedidos()" style="display:flex;align-items:center;gap:6px;font-size:13px;color:#64748b;font-weight:700;background:none;border:none;cursor:pointer;margin-bottom:16px;">← Voltar</button>
+        <h3 style="font-size:16px;font-weight:700;color:#0f172a;margin:0 0 16px;">Todas as pendências</h3>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            ${!(issues||[]).length ? '<p style="text-align:center;color:#64748b;font-size:13px;padding:32px 0;">Nenhuma pendência registrada.</p>' :
+            (issues||[]).map(i => {
+                const assign = assignMap[i.assignment_id];
+                const code = assign?.order_assignment_groups?.order_code || '—';
+                return `<div onclick="openIssueChat('${i.id}','${(i.title||'').replace(/'/g,"\'")}'); " style="background:white;border-radius:12px;border:1px solid ${i.status==='resolved'?'#e2e8f0':'#FAC775'};padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;">
+                    <div><p style="font-weight:500;font-size:13px;color:#0f172a;margin:0;">${escapeHtml(i.title)}</p><p style="font-size:11px;color:#64748b;margin:0;">Pedido #${escapeHtml(code)} · ${i.status==='resolved'?'✅ Resolvido':'⏳ Aguardando'}</p></div>
+                    <span style="color:#64748b;">→</span>
+                </div>`;
+            }).join('')}
+        </div>
+    </div>`;
+}
+
+// ─── FIM PENDÊNCIAS ───────────────────────────────────────────────────────
+
 async function renderPedidos() {
     const fn = String(window.__profile?.job_function || 'separador').toLowerCase();
     if (fn === 'repositor') {
@@ -2672,15 +2873,8 @@ console.log('GROUP RAW:', data?.[0]?.order_assignment_groups);
 
    const hoje = todayLocalISO();
 
-const pedidosHoje = list.filter(o => {
-    if (!o.created_at) return false;
-
-    const dataLocalPedido = new Date(o.created_at).toLocaleDateString('en-CA', {
-        timeZone: 'America/Sao_Paulo'
-    });
-
-    return dataLocalPedido === hoje;
-});
+// Temporário: sem filtro de data para testar layout
+const pedidosHoje = list;
 
 if (!pedidosHoje.length) {
     document.getElementById('view-container').innerHTML = `
@@ -2774,184 +2968,112 @@ const resumo = {
         return `<span class="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-black uppercase bg-red-100 text-red-700 border border-red-200">Atrasado</span>`;
     }
 
-    const cards = pedidosHoje.map(o => {
-        const g = Array.isArray(o.order_assignment_groups)
-    ? (o.order_assignment_groups[0] || {})
-    : (o.order_assignment_groups || {});
+    // Busca sistemas da loja para botão dinâmico
+    const storeIds = [...new Set(pedidosHoje.map(o => {
+        const g = Array.isArray(o.order_assignment_groups) ? (o.order_assignment_groups[0]||{}) : (o.order_assignment_groups||{});
+        return g.store_id;
+    }).filter(Boolean))];
+    let storeSystems = {};
+    if (storeIds.length) {
+        const { data: sysList } = await _sb.from('store_chain_systems')
+            .select('store_id, store_systems(id, name, icon, url)')
+            .in('store_id', storeIds);
+        (sysList||[]).forEach(s => { storeSystems[s.store_id] = s.store_systems; });
+    }
 
-const storeObj = Array.isArray(g.stores)
-    ? (g.stores[0] || {})
-    : (g.stores || {});
-
-const loja = storeObj.name || 'Loja não informada';
-const codigo = g.order_code ? `#${g.order_code}` : `#${String(o.id).slice(0, 8)}`;
-const canal = g.channel || 'Canal não informado';
+    function buildPedidoCard(o) {
+        const g = Array.isArray(o.order_assignment_groups) ? (o.order_assignment_groups[0]||{}) : (o.order_assignment_groups||{});
+        const storeObj = Array.isArray(g.stores) ? (g.stores[0]||{}) : (g.stores||{});
+        const loja = storeObj.name || 'Loja não informada';
+        const codigo = g.order_code ? `#${g.order_code}` : `#${String(o.id).slice(0,8)}`;
+        const canal = g.channel || '';
         const obs = g.manager_note || '';
-        const itens = (o.items_count ?? '—');
+        const itens = o.items_count ?? '—';
+        const rawSys = storeSystems[g.store_id];
+        const systems = Array.isArray(rawSys) ? rawSys : (rawSys ? [rawSys] : []);
 
-        let actions = '';
+        const badgeMap = {
+            pending_acceptance: '<span style="background:#FAEEDA;color:#854F0B;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:500;">Aguardando aceite</span>',
+            in_progress: '<span style="background:#E6F1FB;color:#185FA5;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:500;">Em andamento</span>',
+            completed: '<span style="background:#EAF3DE;color:#3B6D11;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:500;">Concluído ✓</span>',
+            refused: '<span style="background:#FCEBEB;color:#A32D2D;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:500;">Recusado</span>',
+        };
+
+        const infoRow = (label, value, vStyle='') => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;color:#64748b;">${label}</span><span style="font-size:12px;font-weight:500;${vStyle}">${value}</span></div>`;
+
+        let rows = '';
         if (o.status === 'pending_acceptance') {
-            actions = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
-                    <button onclick="aceitarPedido('${o.id}')" class="btn-action bg-emerald-600 text-white font-black">
-                        ACEITAR PEDIDO
-                    </button>
-                    <button onclick="recusarPedido('${o.id}')" class="btn-action bg-red-600 text-white font-black">
-                        RECUSAR PEDIDO
-                    </button>
-                </div>
-            `;
+            rows += infoRow('Itens', itens);
+            rows += infoRow('Recebido em', fmtDateTime(o.created_at));
+            if (canal) rows += infoRow('Canal', esc(canal));
         } else if (o.status === 'in_progress') {
-            actions = `
-                <div class="mt-5">
-                    <button onclick="finalizarPedido('${o.id}')" class="btn-action bg-slate-900 text-white font-black">
-                        FINALIZAR TAREFA
-                    </button>
-                </div>
-            `;
-        } else if (o.status === 'refused' && o.refusal_reason) {
-            actions = `
-                <div class="mt-5">
-                    <button onclick="openOrderRefusal('${o.id}')" class="btn-action bg-slate-900 text-white font-black">
-                        VER MOTIVO
-                    </button>
-                </div>
-            `;
+            rows += infoRow('Itens', itens);
+            if (o.accepted_at) rows += infoRow('Aceito em', fmtDateTime(o.accepted_at));
+            if (canal) rows += infoRow('Canal', esc(canal));
+        } else if (o.status === 'completed') {
+            rows += infoRow('Itens separados', itens);
+            rows += infoRow('Finalizado em', fmtDateTime(o.completed_at), o.completed_on_time ? 'color:#3B6D11;' : 'color:#A32D2D;');
+            rows += infoRow('No prazo', o.completed_on_time ? '✓ Sim' : '✗ Não', o.completed_on_time ? 'color:#3B6D11;' : 'color:#A32D2D;');
+            if (!o.completed_on_time && o.late_reason) rows += infoRow('Motivo', esc(o.late_reason), 'color:#A32D2D;');
+        } else if (o.status === 'refused') {
+            rows += infoRow('Recusado em', fmtDateTime(o.refused_at));
+            if (o.refusal_reason) rows += infoRow('Motivo', esc(o.refusal_reason), 'color:#A32D2D;');
         }
 
-        let detalheStatus = '';
-        if (o.status === 'completed') {
-            detalheStatus = `
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Itens</div>
-                        <div class="text-base font-black text-slate-800">${itens}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Finalizado em</div>
-                        <div class="text-sm font-black text-slate-800">${fmtDateTime(o.completed_at)}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Prazo</div>
-                        <div class="text-sm font-black ${o.completed_on_time ? 'text-emerald-600' : 'text-red-600'}">
-                            ${o.completed_on_time ? 'Sim' : 'Não'}
-                        </div>
-                    </div>
-                </div>
-                ${!o.completed_on_time && o.late_reason ? `
-                    <div class="mt-3 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-2xl p-3">
-                        Motivo do atraso: ${esc(o.late_reason)}
-                    </div>
-                ` : ''}
-            `;
+        let buttons = '';
+        if (o.status === 'pending_acceptance') {
+            buttons = `<div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button onclick="aceitarPedido('${o.id}')" style="padding:12px;background:#059669;color:white;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">ACEITAR</button>
+                <button onclick="recusarPedido('${o.id}')" style="padding:12px;background:#FCEBEB;color:#A32D2D;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">RECUSAR</button>
+            </div>`;
+        } else if (o.status === 'in_progress') {
+            const sysBtns = systems.map(s => `<button onclick="window.open('${s.url||'#'}')" style="width:100%;padding:10px;background:#E6F1FB;color:#185FA5;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><span>${s.icon||'🔗'}</span> Abrir ${esc(s.name)}</button>`).join('');
+            buttons = `<div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px;">
+                ${sysBtns}
+                <button onclick="finalizarPedido('${o.id}')" style="width:100%;padding:12px;background:#0f172a;color:white;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;">FINALIZAR TAREFA</button>
+                <button onclick="renderIssues('${o.id}', '${codigo.replace(/'/g,"\'")}')" style="width:100%;padding:10px;background:transparent;color:#854F0B;border:0.5px solid #FAC775;border-radius:10px;font-size:12px;font-weight:500;cursor:pointer;">⚠️ Reportar pendência</button>
+            </div>`;
         }
 
-        if (o.status === 'refused') {
-            detalheStatus = `
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Recusado em</div>
-                        <div class="text-sm font-black text-slate-800">${fmtDateTime(o.refused_at)}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Motivo</div>
-                        <div class="text-sm font-black text-red-600">${esc(o.refusal_reason || 'Não informado')}</div>
-                    </div>
+        return `<div style="background:white;border-radius:16px;border:1.5px solid #e2e8f0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.07);">
+            <div style="padding:14px 16px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <div style="min-width:0;">
+                    <p style="font-size:15px;font-weight:500;color:#0f172a;margin:0;">${esc(codigo)} · ${esc(loja)}</p>
+                    <p style="font-size:12px;color:#64748b;margin:0;">${canal ? esc(canal) : ''}</p>
+                    ${obs ? `<p style="font-size:11px;color:#854F0B;margin:4px 0 0;background:#FAEEDA;border-radius:6px;padding:3px 8px;display:inline-block;">📝 ${esc(obs)}</p>` : ''}
                 </div>
-            `;
-        }
-
-        if (o.status === 'pending_acceptance' || o.status === 'in_progress') {
-            detalheStatus = `
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Criado em</div>
-                        <div class="text-sm font-black text-slate-800">${fmtDateTime(o.created_at)}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Aceito em</div>
-                        <div class="text-sm font-black text-slate-800">${fmtDateTime(o.accepted_at)}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Canal</div>
-                        <div class="text-sm font-black text-slate-800">${esc(canal)}</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="card-nexo border border-slate-200">
-                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2 mb-2">
-                            ${statusBadge(o.status)}
-                            ${prazoBadge(o)}
-                        </div>
-
-                        <div class="text-[11px] font-black uppercase text-slate-400">Loja</div>
-                        <h3 class="text-2xl font-black text-slate-900 uppercase leading-tight">${esc(loja)}</h3>
-
-                        <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-bold text-slate-600">
-                            <span><span class="text-slate-400 uppercase text-[10px] font-black">Pedido</span> ${esc(codigo)}</span>
-                            <span><span class="text-slate-400 uppercase text-[10px] font-black">Canal</span> ${esc(canal)}</span>
-                        </div>
-
-                        ${obs ? `
-                            <div class="mt-3 text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-2xl p-3">
-                                <span class="text-[10px] font-black uppercase text-slate-400 block mb-1">Observação do gerente</span>
-                                ${esc(obs)}
-                            </div>
-                        ` : ''}
-                    </div>
-
-                    <div class="md:text-right shrink-0">
-                        <div class="text-[10px] font-black uppercase text-slate-400">Registro</div>
-                        <div class="text-sm font-black text-slate-800">${fmtDateTime(o.created_at)}</div>
-                    </div>
-                </div>
-
-                ${detalheStatus}
-                ${actions}
+                ${badgeMap[o.status]||''}
             </div>
-        `;
-    }).join('');
+            ${rows}
+            ${buttons}
+        </div>`;
+    }
+
+    const pendentes = pedidosHoje.filter(o => o.status === 'pending_acceptance');
+    const emAndamento = pedidosHoje.filter(o => o.status === 'in_progress');
+    const concluidos = pedidosHoje.filter(o => o.status === 'completed');
+    const recusados = pedidosHoje.filter(o => o.status === 'refused');
+    const secLabel = (l, c) => c > 0 ? `<p style="font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px;">${l} (${c})</p>` : '';
+    const secCards = (list) => list.length ? `<div style="display:flex;flex-direction:column;gap:16px;margin-bottom:24px;">${list.map(buildPedidoCard).join('')}</div>` : '';
+
+    // Busca total de pendências abertas
+    const { count: issueCount } = await _sb.from('order_issues')
+        .select('id', { count: 'exact', head: true })
+        .in('assignment_id', pedidosHoje.map(o => o.id))
+        .eq('status', 'open');
 
     document.getElementById('view-container').innerHTML = `
-        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">Hoje</div>
-                <div class="text-3xl font-black text-slate-900">${resumo.hoje}</div>
-            </div>
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">Pendentes</div>
-                <div class="text-3xl font-black text-amber-600">${resumo.pendentes}</div>
-            </div>
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">Em andamento</div>
-                <div class="text-3xl font-black text-indigo-600">${resumo.emAndamento}</div>
-            </div>
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">Concluídos</div>
-                <div class="text-3xl font-black text-emerald-600">${resumo.concluidos}</div>
-            </div>
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">No prazo</div>
-                <div class="text-3xl font-black text-emerald-600">${resumo.noPrazo}</div>
-            </div>
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">Atrasados</div>
-                <div class="text-3xl font-black text-red-600">${resumo.atrasados}</div>
-            </div>
-            <div class="card-nexo border-none">
-                <div class="text-[10px] font-black uppercase text-slate-400">Recusados</div>
-                <div class="text-3xl font-black text-red-600">${resumo.recusados}</div>
-            </div>
+        ${issueCount > 0 ? `<button onclick="renderAllIssues()" style="width:100%;margin-bottom:12px;padding:10px 16px;background:#FAEEDA;color:#854F0B;border:1px solid #FAC775;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">⚠️ Pendências abertas<span style="background:#854F0B;color:white;border-radius:99px;padding:2px 8px;font-size:11px;">${issueCount}</span></button>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;">
+            <div class="card-nexo border-none"><div class="text-[10px] font-black uppercase text-slate-400">Hoje</div><div class="text-3xl font-black text-slate-900">${resumo.hoje}</div></div>
+            <div class="card-nexo border-none"><div class="text-[10px] font-black uppercase text-slate-400">Pendentes</div><div class="text-3xl font-black text-amber-600">${resumo.pendentes}</div></div>
+            <div class="card-nexo border-none"><div class="text-[10px] font-black uppercase text-slate-400">Andamento</div><div class="text-3xl font-black text-blue-600">${resumo.emAndamento}</div></div>
+            <div class="card-nexo border-none"><div class="text-[10px] font-black uppercase text-slate-400">Concluídos</div><div class="text-3xl font-black text-emerald-600">${resumo.concluidos}</div></div>
         </div>
-
-        <div class="space-y-5">
-            ${cards}
-        </div>
+        ${secLabel('Aguardando aceite', pendentes.length)}${secCards(pendentes)}
+        ${secLabel('Em andamento', emAndamento.length)}${secCards(emAndamento)}
+        ${secLabel('Concluídos', concluidos.length)}${secCards(concluidos)}
+        ${secLabel('Recusados', recusados.length)}${secCards(recusados)}
     `;
 
     showLoading(false);
@@ -3046,6 +3168,12 @@ async function finalizarPedido(assignmentId) {
     if (!data || !data.length) {
         return alert('Nenhum pedido foi finalizado. O banco não atualizou a linha.');
     }
+
+    // Resolver pendências abertas automaticamente
+    await _sb.from('order_issues')
+        .update({ status: 'resolved' })
+        .eq('assignment_id', assignmentId)
+        .eq('status', 'open');
 
     alert('Pedido finalizado com sucesso.');
     await renderPedidos();
